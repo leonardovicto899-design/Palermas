@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Palermas</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background-color: #000; font-family: 'Arial', sans-serif; font-weight: 300; overflow-x: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; color: white; }
+        .screen { position: absolute; width: 100%; height: 100vh; display: flex; justify-content: center; align-items: center; transition: transform 0.8s ease, opacity 0.8s ease; opacity: 1; }
+        .screen.slide-from-right { transform: translateX(100%); }
+        .screen.active { transform: translateX(0); opacity: 1; }
+        .screen.fade-out { opacity: 0; pointer-events: none; }
+        
+        #story-screen { display: none; flex-direction: column; justify-content: flex-start; align-items: flex-start; padding: 40px; z-index: 50; width: 100%; max-width: 800px; }
+        #story-screen.show { display: flex; }
+        #story-text { font-family: 'Courier New', Courier, monospace; font-size: 1.2rem; line-height: 1.6; white-space: pre-wrap; min-height: 100px; }
+        
+        #chapter-title { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-family: 'Courier New', Courier, monospace; font-size: 2rem; text-align: center; opacity: 0; transition: opacity 1.5s ease; z-index: 60; pointer-events: none; }
+        #chapter-title.visible { opacity: 1; }
+        
+        #options-container { display: none; flex-direction: column; gap: 15px; margin-top: 30px; width: 100%; opacity: 0; transition: opacity 0.5s ease; }
+        #options-container.visible { display: flex; opacity: 1; }
+        
+        .option-btn { background: transparent; border: 1px solid #444; border-left: 4px solid #fff; color: #ccc; padding: 15px 20px; text-align: left; font-family: 'Courier New', Courier, monospace; font-size: 1rem; cursor: pointer; transition: all 0.2s ease; }
+        .option-btn:hover { background: #fff; color: #000; border-color: #fff; padding-left: 30px; }
+        .option-btn.locked { opacity: 0.3; cursor: not-allowed; border-left: 4px solid #444; text-decoration: line-through; color: #666; pointer-events: none; }
+        
+        #continue-btn { display: none; margin-top: 30px; background-color: transparent; color: #fff; border: 1px solid #fff; padding: 10px 30px; font-family: 'Courier New', Courier, monospace; cursor: pointer; align-self: flex-start; }
+        #continue-btn:hover { background-color: #fff; color: #000; }
+        
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.95); justify-content: center; align-items: center; z-index: 1000; }
+        .modal.show { display: flex; }
+        .modal-content { display: flex; flex-direction: column; align-items: center; gap: 30px; }
+        .modal-title { color: #fff; font-size: 1.5rem; font-weight: 300; letter-spacing: 0.1em; }
+        .code-input { background-color: transparent; color: #fff; border: 1px solid #fff; padding: 15px 30px; font-size: 1.5rem; font-weight: 300; text-align: center; letter-spacing: 0.3em; text-transform: uppercase; width: 300px; }
+        .code-input:focus { outline: none; background-color: rgba(255, 255, 255, 0.1); }
+        .modal-buttons { display: flex; gap: 15px; }
+        .modal-btn { background-color: transparent; color: #fff; border: 1px solid #fff; padding: 10px 30px; font-size: 1rem; font-weight: 300; cursor: pointer; transition: all 0.3s ease; letter-spacing: 0.05em; }
+        .modal-btn:hover { background-color: #fff; color: #000; }
+        .modal-close { border-color: #555; color: #aaa; }
+        .modal-close:hover { background-color: #333; color: #fff; border-color: #333; }
+        
+        #initial-screen { flex-direction: column; transition: transform 0.8s ease, opacity 0.8s ease; }
+        #initial-screen.slide-left { transform: translateX(-40%); }
+        .title-container { display: flex; flex-direction: column; align-items: center; }
+        h1 { color: #fff; font-size: 4rem; font-weight: 300; margin-bottom: 3rem; letter-spacing: 0.1em; }
+        .btn { background-color: transparent; color: #fff; border: 1px solid #fff; padding: 15px 50px; font-size: 1.2rem; font-weight: 300; cursor: pointer; transition: all 0.3s ease; letter-spacing: 0.05em; }
+        .btn:hover { background-color: #fff; color: #000; }
+        
+        #selection-screen { flex-direction: column; gap: 20px; }
+        .player-btn { background-color: transparent; color: #fff; border: 1px solid #fff; padding: 20px 80px; font-size: 1.5rem; font-weight: 300; cursor: pointer; transition: all 0.3s ease; letter-spacing: 0.05em; min-width: 300px; position: relative; }
+        .player-btn:hover { background-color: #fff; color: #000; }
+        .player-btn.unlocked::after { content: ''; position: absolute; right: 30px; top: 50%; transform: translateY(-50%); width: 8px; height: 8px; background-color: #fff; border-radius: 50%; transition: background-color 0.3s ease; }
+        .player-btn.unlocked:hover::after { background-color: #000; }
+        
+        .player-btn.locked-char { opacity: 0.3; cursor: not-allowed; border-color: #444; color: #666; pointer-events: none; }
+        .player-btn.finished { opacity: 0.5; text-decoration: line-through; border-color: #555; color: #555; cursor: default; pointer-events: none; }
+        .player-btn.finished::after { display: none; }
+        
+        /* Estilo especial para o Gabriel */
+        #btn-gabriel { display: none; } 
+        #btn-gabriel.unlocked { border-color: #ff4444; color: #ff4444; }
+        #btn-gabriel.unlocked:hover { background-color: #ff4444; color: #000; }
+        #btn-gabriel.unlocked::after { background-color: #ff4444; }
+
+        /* Tooltip "Em produção" */
+        .player-btn[data-tooltip]:hover::before {
+            content: attr(data-tooltip);
+            position: absolute;
+            top: -40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #fff;
+            color: #000;
+            padding: 5px 10px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            border-radius: 0;
+            white-space: nowrap;
+            opacity: 1;
+            pointer-events: none;
+            border: 1px solid #000;
+        }
+        /* Triângulo do tooltip */
+        .player-btn[data-tooltip]:hover::after {
+            content: ''; /* Remove a bolinha branca se existir conflito, mas locked-char nao tem bolinha */
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 5px;
+            border-style: solid;
+            border-color: #fff transparent transparent transparent;
+        }
+        /* Ajuste para não conflitar com a bolinha da classe unlocked se um dia usar tooltip nela */
+        .player-btn.unlocked[data-tooltip]:hover::after {
+            /* Restaura a bolinha se for unlocked */
+            content: ''; 
+            position: absolute;
+            right: 30px;
+            top: 50%;
+            left: auto;
+            transform: translateY(-50%);
+            width: 8px;
+            height: 8px;
+            background-color: #000;
+            border-radius: 50%;
+            border: none;
+        }
+        
+        .help-btn { position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; background-color: transparent; color: #fff; border: 1px solid #fff; border-radius: 50%; font-size: 2rem; font-weight: 300; cursor: pointer; transition: all 0.3s ease; display: flex; justify-content: center; align-items: center; }
+        .help-btn:hover { background-color: #fff; color: #000; }
+        .back-btn { position: fixed; top: 30px; left: 30px; background-color: transparent; color: #fff; border: 1px solid #fff; padding: 10px 30px; font-size: 1rem; font-weight: 300; cursor: pointer; transition: all 0.3s ease; letter-spacing: 0.05em; }
+        .back-btn:hover { background-color: #fff; color: #000; }
+    </style>
+</head>
+<body>
+    <div id="initial-screen" class="screen active">
+        <div class="title-container">
+            <h1>Palermas</h1>
+            <button class="btn" onclick="prosseguir()">Prosseguir</button>
+        </div>
+    </div>
+
+    <div id="selection-screen" class="screen slide-from-right">
+        <button class="back-btn" onclick="voltar()">Voltar</button>
+        
+        <!-- ERICKY: Primeiro e Liberado -->
+        <button id="btn-ericky" class="player-btn unlocked" onclick="iniciarHistoria('ericky')">Ericky</button>
+        
+        <!-- LEO: Segundo e Bloqueado inicialmente -->
+        <button id="btn-leo" class="player-btn locked-char" onclick="iniciarHistoria('leo')">Leo</button> 
+        
+        <!-- GABRIEL: Invisível até código -->
+        <button id="btn-gabriel" class="player-btn locked-char" onclick="iniciarHistoria('gabriel')">Gabriel</button>
+        
+        <!-- ISAQUE & VITOR: Bloqueados e com Tooltip -->
+        <button id="btn-isaque" class="player-btn locked-char" data-tooltip="Em produção">Isaque</button>
+        <button id="btn-vitor" class="player-btn locked-char" data-tooltip="Em produção">Vitor</button>
+        
+        <button class="help-btn" onclick="abrirModal()">?</button>
+    </div>
+
+    <div id="chapter-title"></div>
+
+    <div id="story-screen" class="screen">
+        <div id="story-text"></div>
+        <div id="options-container"></div>
+        <button id="continue-btn">Continuar</button>
+    </div>
+
+    <div id="code-modal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-title">Insira o código</h2>
+            <input type="text" id="secret-code-input" class="code-input" maxlength="10" placeholder="_ _ _ _ _ _ _">
+            <div class="modal-buttons">
+                <button class="modal-btn" onclick="verificarCodigo()">Confirmar</button>
+                <button class="modal-btn modal-close" onclick="fecharModal()">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let audioEnabled = false;
+        function initAudio() { if (audioCtx.state === 'suspended') { audioCtx.resume().then(() => { audioEnabled = true; }); } else { audioEnabled = true; } }
+        function playTone(freq, type, duration, vol = 0.05) { if (!audioEnabled) return; const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain(); osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime); gain.gain.setValueAtTime(vol, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration); osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + duration); }
+        function sfxChapter() { if (!audioEnabled) return; const now = audioCtx.currentTime; [110, 164.8, 220].forEach((f, i) => { const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain(); osc.type = 'sawtooth'; osc.frequency.value = f; gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(0.15 - (i*0.03), now + 0.5); gain.gain.exponentialRampToValueAtTime(0.001, now + 3.0); const filter = audioCtx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 800; osc.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination); osc.start(now); osc.stop(now + 3.0); }); }
+        function sfxType() { playTone(800 + Math.random() * 100, 'square', 0.03, 0.02); }
+        function sfxClick() { playTone(400, 'sine', 0.1, 0.05); }
+        function sfxThud() { if (!audioEnabled) return; const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain(); osc.type = 'triangle'; osc.frequency.setValueAtTime(150, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.2); gain.gain.setValueAtTime(0.5, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3); osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.3); }
+
+        // --- META GAME & PERSISTÊNCIA ---
+        const SAVE_KEY = 'palermas_save_data';
+
+        let metaGame = {
+            erickyJogou: false,
+            erickyPegouIsqueiro: false,
+            erickyPegouFerro: false, 
+            erickyAjudouLeo: false, 
+            leoDesbloqueado: false,
+            leoJogou: false,
+            codigoCassinoAtivo: false
+        };
+
+        function salvarProgresso() {
+            localStorage.setItem(SAVE_KEY, JSON.stringify(metaGame));
+        }
+
+        function carregarProgresso() {
+            const saved = localStorage.getItem(SAVE_KEY);
+            if (saved) {
+                try {
+                    metaGame = JSON.parse(saved);
+                    atualizarInterfaceMenu();
+                } catch (e) {
+                    console.error("Erro ao carregar save", e);
+                }
+            }
+        }
+
+        function atualizarInterfaceMenu() {
+            const btnEricky = document.getElementById('btn-ericky');
+            const btnLeo = document.getElementById('btn-leo');
+            const btnGabriel = document.getElementById('btn-gabriel');
+
+            // Estado Ericky
+            if (metaGame.erickyJogou) {
+                btnEricky.classList.remove('unlocked');
+                btnEricky.classList.add('finished');
+                btnEricky.onclick = null;
+            }
+
+            // Estado Leo
+            if (metaGame.leoDesbloqueado) {
+                if (metaGame.leoJogou) {
+                    btnLeo.classList.remove('locked-char', 'unlocked');
+                    btnLeo.classList.add('finished');
+                    btnLeo.onclick = null;
+                } else {
+                    btnLeo.classList.remove('locked-char');
+                    btnLeo.classList.add('unlocked');
+                }
+            }
+
+            // Estado Gabriel
+            if (metaGame.codigoCassinoAtivo) {
+                btnGabriel.style.display = 'inline-block';
+                if (metaGame.erickyJogou && metaGame.leoJogou) {
+                    btnGabriel.classList.remove('locked-char');
+                    btnGabriel.classList.add('unlocked');
+                }
+            }
+        }
+
+        // Carregar ao iniciar
+        window.onload = () => {
+            carregarProgresso();
+        };
+
+        // --- ESTADO DA SESSÃO ATUAL ---
+        let gameState = {
+            inventario: [],
+            experienciaCombate: 0,
+            conhecimentoEngenharia: 0,
+            saude: 100,
+            paranoia: false,
+            leoSalvo: false,
+            leoStatus: 'normal',
+            quartoVasculhado: false,
+            relacionamentoLeo: 0,
+            erickyFinalizado: false
+        };
+
+        function prosseguir() { initAudio(); sfxClick(); document.getElementById('initial-screen').classList.add('slide-left'); document.getElementById('selection-screen').classList.add('active'); }
+        function voltar() { sfxClick(); document.getElementById('initial-screen').classList.remove('slide-left'); document.getElementById('selection-screen').classList.remove('active'); }
+        
+        // --- CÓDIGO SECRETO ---
+        function abrirModal() { sfxClick(); document.getElementById('code-modal').classList.add('show'); document.getElementById('secret-code-input').focus(); }
+        function fecharModal() { sfxClick(); document.getElementById('code-modal').classList.remove('show'); }
+        
+        function verificarCodigo() {
+            sfxClick();
+            const input = document.getElementById('secret-code-input');
+            const codigo = input.value.toUpperCase().trim();
+            
+            if (codigo === "CASSINO") { 
+                alert("Segredo Revelado: Rota de Gabriel visível");
+                metaGame.codigoCassinoAtivo = true;
+                salvarProgresso();
+                atualizarInterfaceMenu();
+                fecharModal();
+            } else if (codigo === "RESET") {
+                // Cheat para limpar save
+                if(confirm("Apagar todo o progresso?")) {
+                    localStorage.removeItem(SAVE_KEY);
+                    location.reload();
+                }
+            } else if (codigo === "LIBERAR") { 
+                alert("CHEAT: Tudo Liberado");
+                metaGame.erickyJogou = true;
+                metaGame.leoJogou = true;
+                metaGame.leoDesbloqueado = true;
+                salvarProgresso();
+                atualizarInterfaceMenu();
+                fecharModal();
+            } else { 
+                alert("Código Inválido"); 
+                input.value = ""; 
+                input.focus(); 
+            }
+        }
+
+        document.getElementById('secret-code-input').addEventListener('keypress', function (e) { if (e.key === 'Enter') verificarCodigo(); });
+        document.getElementById('code-modal').addEventListener('click', function(e) { if (e.target === this) fecharModal(); });
+
+        let typingTimer;
+        function digitarTexto(texto, elemento, callback) {
+            let i = 0;
+            if (typingTimer) clearTimeout(typingTimer);
+            const parteLenta = "e . . .";
+            const indexInicioLento = texto.indexOf(parteLenta);
+            function type() {
+                if (i < texto.length) {
+                    const char = texto.charAt(i);
+                    elemento.textContent += char;
+                    if (char !== ' ' && char !== '\n') sfxType();
+                    i++;
+                    let delay = 30;
+                    if (indexInicioLento !== -1 && i >= indexInicioLento) delay = 200;
+                    if (texto.charAt(i-1) === '.') delay += 150;
+                    typingTimer = setTimeout(type, delay);
+                } else { if (callback) callback(); }
+            }
+            type();
+        }
+
+        function iniciarHistoria(personagem) {
+            initAudio(); sfxClick();
+            
+            // Bloqueios de UI ( redundância caso o CSS falhe ou hack )
+            if (personagem === 'ericky' && gameState.erickyFinalizado) return;
+            if (personagem === 'leo' && !metaGame.leoDesbloqueado) return;
+            if (personagem === 'gabriel' && (!metaGame.erickyJogou || !metaGame.leoJogou)) return;
+
+            gameState = { inventario: [], experienciaCombate: 0, conhecimentoEngenharia: 0, saude: 100, paranoia: false, leoSalvo: false, leoStatus: 'normal', quartoVasculhado: false, relacionamentoLeo: 0, erickyFinalizado: gameState.erickyFinalizado };
+
+            const storyText = document.getElementById('story-text');
+            const optionsContainer = document.getElementById('options-container');
+            storyText.textContent = '';
+            optionsContainer.innerHTML = '';
+            optionsContainer.classList.remove('visible');
+            document.getElementById('continue-btn').style.display = 'none';
+            document.getElementById('selection-screen').classList.add('fade-out');
+            document.getElementById('initial-screen').classList.add('fade-out');
+
+            setTimeout(() => {
+                document.getElementById('selection-screen').style.display = 'none';
+                document.getElementById('initial-screen').style.display = 'none';
+                document.getElementById('story-screen').classList.add('show');
+                
+                if (personagem === 'ericky') iniciarRotaEricky();
+                else if (personagem === 'leo') iniciarRotaLeo();
+                else if (personagem === 'gabriel') {
+                    digitarTexto("A rota de Gabriel começa aqui... (Continua em breve)", storyText, () => {
+                        const btn = document.getElementById('continue-btn');
+                        btn.textContent = "Voltar";
+                        btn.style.display = 'block';
+                        btn.onclick = () => location.reload();
+                    });
+                }
+            }, 800);
+        }
+
+        function mostrarTituloCapitulo(titulo, callback) {
+            const chapterTitle = document.getElementById('chapter-title');
+            chapterTitle.textContent = titulo;
+            sfxChapter();
+            chapterTitle.classList.add('visible');
+            setTimeout(() => { chapterTitle.classList.remove('visible'); setTimeout(callback, 1500); }, 3000);
+        }
+
+        // ==================== ROTA DO ERICKY =======================
+        function iniciarRotaEricky() {
+            const storyText = document.getElementById('story-text');
+            const intro = `.\nTrês dias depois do Primeiro Estrondo\nEricky perdeu os pais no primeiro colapso.\n\nAgora vaga sozinho por Manaus com:\num cantil\num pano ensanguentado\numa foto rasgada\ne . . .\n\num baseado`;
+            digitarTexto(intro, storyText, () => {
+                setTimeout(() => { storyText.textContent = ''; mostrarTituloCapitulo("CAPÍTULO 1 — “Entre Ruas Vazias”", () => { digitarTexto("Ericky está próximo ao Baratão da Carne, procurando comida.", storyText, () => { mostrarOpcoesIniciaisEricky(); }); }); }, 2000);
+            });
+        }
+
+        function mostrarOpcoesIniciaisEricky() {
+            const optionsContainer = document.getElementById('options-container');
+            optionsContainer.innerHTML = `
+                <button class="option-btn" onclick="escolherOpcaoEricky('A')">A. Mercado saqueado</button>
+                <button class="option-btn" onclick="escolherOpcaoEricky('B')">B. Ônibus 640 tombado</button>
+                <button class="option-btn" onclick="escolherOpcaoEricky('C')">C. T4</button>
+            `;
+            optionsContainer.classList.add('visible');
+        }
+
+        function escolherOpcaoEricky(escolha) {
+            sfxClick();
+            const optionsContainer = document.getElementById('options-container');
+            const storyText = document.getElementById('story-text');
+            const continueBtn = document.getElementById('continue-btn');
+            optionsContainer.classList.remove('visible');
+            
+            setTimeout(() => {
+                storyText.textContent = '';
+                let txt = "";
+                if (escolha === 'A') {
+                    txt += "Você entra furtivamente no mercado devastado. As prateleiras estão vazias e o cheiro é podre.\n\n";
+                    if (Math.random() > 0.3) {
+                        txt += "Vasculhando o caixa, você encontra um isqueiro ainda com gás. Sorte.\n(Item: Isqueiro)";
+                        gameState.inventario.push("Isqueiro");
+                        metaGame.erickyPegouIsqueiro = true; 
+                    } else { txt += "Só prateleiras vazias."; }
+                    if (Math.random() > 0.6) {
+                        txt += "\nDe repente, passos pesados. Um saqueador surge do corredor de bebidas. Você chuta uma prateleira sobre ele e foge pelos fundos.\n(+1 Exp Combate)";
+                        gameState.experienciaCombate += 1;
+                    } else { txt += "\nO local está silencioso. Você sai antes que alguém apareça."; }
+                } else if (escolha === 'B') {
+                    txt += "O esqueleto metálico do 640 bloqueia a via. Você entra pela janela quebrada.\n\n";
+                    txt += "Embaixo de um banco, você acha uma barra de ferro pesada e uma moeda antiga.\n(Item: Ferro, Moeda)";
+                    gameState.inventario.push("Barra de Ferro", "Moeda");
+                    metaGame.erickyPegouFerro = true;
+                    if (Math.random() > 0.7) {
+                        txt += "\nAo sair, sua pressa te trai. Você rasga o braço na lataria exposta.\n(Braço ferido: Combate reduzido)";
+                        gameState.saude -= 10;
+                    } else { txt += "\nVocê sai ileso, segurando seus novos itens."; }
+                } else if (escolha === 'C') {
+                    txt += "O Terminal 4 é um cemitério de concreto. O vento uiva entre as pilastras.\n\n";
+                    if (Math.random() > 0.8) {
+                        txt += "Incrível. Alguém esqueceu um isqueiro funcional num banco. Você pega.\n(Item: Isqueiro)";
+                        gameState.inventario.push("Isqueiro");
+                        metaGame.erickyPegouIsqueiro = true;
+                    } else { txt += "Nada de útil nos bancos de espera, apenas lixo.\n"; }
+                    if (Math.random() > 0.5) {
+                        txt += "Você arranca um pedaço de madeira firme de um tapume caído. Pode servir de arma.\n(Item: Madeira)";
+                        gameState.inventario.push("Pedaço de Madeira");
+                    }
+                }
+                salvarProgresso(); // Salva itens pegos
+                digitarTexto(txt, storyText, () => {
+                    continueBtn.style.display = 'block';
+                    continueBtn.onclick = irParaCasaEricky;
+                    continueBtn.textContent = "Voltar para casa";
+                });
+            }, 500);
+        }
+
+        function irParaCasaEricky() {
+            sfxClick();
+            const storyText = document.getElementById('story-text');
+            const continueBtn = document.getElementById('continue-btn');
+            continueBtn.style.display = 'none';
+            storyText.textContent = '';
+            digitarTexto("Depois disso, Ericky volta para sua casa destruída pelos tremores.\n\nEle marca no mapa onde vasculhou e seus olhos param em uma foto antiga.\nEle pensa em Nathyeli, desaparecida desde o Primeiro Estrondo.", storyText, () => {
+                const temIsqueiro = gameState.inventario.includes("Isqueiro");
+                const classeBaseado = temIsqueiro ? "option-btn" : "option-btn locked";
+                const acaoBaseado = temIsqueiro ? "escolherAcaoCasaEricky('baseado')" : "";
+                const tooltipBaseado = temIsqueiro ? "" : " (Requer Isqueiro)";
+
+                const optionsContainer = document.getElementById('options-container');
+                optionsContainer.innerHTML = `
+                    <p style="margin-bottom: 10px; color: #888; font-family: 'Courier New';">O que fazer antes de dormir?</p>
+                    <button class="option-btn" onclick="escolherAcaoCasaEricky('dormir')">Dormir</button>
+                    <button class="option-btn" onclick="escolherAcaoCasaEricky('teclado')">Tocar teclado</button>
+                    <button class="${classeBaseado}" onclick="${acaoBaseado}">Acender baseado${tooltipBaseado}</button>
+                `;
+                optionsContainer.classList.add('visible');
+            });
+        }
+
+        function escolherAcaoCasaEricky(acao) {
+            sfxClick();
+            const optionsContainer = document.getElementById('options-container');
+            const storyText = document.getElementById('story-text');
+            optionsContainer.classList.remove('visible');
+            storyText.textContent = '';
+            if (acao === 'dormir') {
+                digitarTexto("O cansaço vence. Ericky se deita nos escombros do que um dia foi uma cama e apaga.\n\nFIM DO DIA 1", storyText, () => setTimeout(iniciarDia2Ericky, 2500));
+            } else if (acao === 'baseado') {
+                digitarTexto("A chama do isqueiro ilumina o quarto por um instante.\nA fumaça acalma os nervos, mas não apaga as memórias.\n\nEricky fuma até o fim e dorme um sono sem sonhos.\n\nFIM DO DIA 1", storyText, () => setTimeout(iniciarDia2Ericky, 3000));
+            } else { 
+                digitarTexto("Ele senta em frente ao teclado empoeirado. Toca os primeiros acordes de uma música que ela gostava.\n\nO som ecoa triste pela casa vazia...\n\nPAFT!\n\nAlguém joga uma pedra na janela.", storyText, () => {
+                    setTimeout(() => {
+                        sfxThud();
+                        digitarTexto("\n\nEricky corre para ver. No escuro da rua, um homem mascarado está parado, encarando a casa.\n\nO homem não diz nada. Após cinco longos segundos, ele se vira e corre para as sombras.\n\nIsso deixa Ericky paranoico.\n(Novo traço: Paranoia)\n\nFIM DO DIA 1", storyText, () => {
+                             gameState.paranoia = true;
+                             setTimeout(iniciarDia2Ericky, 4000);
+                        });
+                    }, 1000);
+                });
+            }
+        }
+
+        function iniciarDia2Ericky() {
+            const storyText = document.getElementById('story-text');
+            storyText.textContent = '';
+            mostrarTituloCapitulo("CAPÍTULO 2 — “Cratera do Grande Circular”", () => {
+                digitarTexto("Ericky acorda com o sol queimando seu rosto.\nEle decide vasculhar a região do Shopping Grande Circular, agora totalmente afundado na terra.", storyText, () => { mostrarOpcoesDia2Ericky(); });
+            });
+        }
+
+        function mostrarOpcoesDia2Ericky() {
+            const optionsContainer = document.getElementById('options-container');
+            optionsContainer.innerHTML = `
+                <p style="margin-bottom: 10px; color: #888; font-family: 'Courier New';">Onde vasculhar?</p>
+                <button class="option-btn" onclick="escolherLocalDia2Ericky('feira')">Feira do Produtor</button>
+                <button class="option-btn" onclick="escolherLocalDia2Ericky('amarelinho')">O Amarelinho</button>
+                <button class="option-btn" onclick="escolherLocalDia2Ericky('db')">DB Mercado</button>
+            `;
+            optionsContainer.classList.add('visible');
+        }
+
+        function escolherLocalDia2Ericky(local) {
+            sfxClick();
+            const optionsContainer = document.getElementById('options-container');
+            const storyText = document.getElementById('story-text');
+            optionsContainer.classList.remove('visible');
+            storyText.textContent = '';
+            let txt = "";
+            if (local === 'feira') {
+                txt = "As bancas estão reviradas e apodrecendo. No chão, em meio à lama, você encontra um telefone com a tela quebrada, mas a bateria parece intacta. Pode ser útil.\n(Item: Telefone Quebrado)";
+                gameState.inventario.push("Telefone Quebrado");
+            } else if (local === 'amarelinho') {
+                txt = "A estrutura do Amarelinho cedeu parcialmente. Vasculhando os escombros, você encontra uma barra de ferro retorcida e pesada.\n(Item: Barra de Ferro)";
+                gameState.inventario.push("Barra de Ferro");
+                metaGame.erickyPegouFerro = true;
+                salvarProgresso();
+            } else {
+                txt = "O DB foi completamente saqueado dias atrás. Não sobrou nada além de prateleiras vazias e vidro quebrado no chão.";
+            }
+            digitarTexto(txt, storyText, () => { setTimeout(cenaCrateraEricky, 2000); });
+        }
+
+        function cenaCrateraEricky() {
+            const storyText = document.getElementById('story-text');
+            storyText.textContent = '';
+            digitarTexto("Quando está prestes a voltar, Ericky ouve gritos agudos vindo da cratera gigante onde ficava a rotatória.\n\nEle sobe em uma passarela quebrada e observa de longe...", storyText, () => {
+                setTimeout(() => {
+                    digitarTexto("TRÊS BANDIDOS CERCAM UM CASAL.", storyText, () => {
+                        sfxThud();
+                        setTimeout(() => {
+                            digitarTexto("\n\nO homem tenta proteger a mulher. Eles lutam, desesperados. Um dos bandidos empurra a mulher com violência...\n\nELA CAI NA CRATERA.", storyText, () => {
+                                setTimeout(() => {
+                                    digitarTexto("\n\nO homem grita de forma animal, implorando, enlouquecido.\nOs bandidos começam a espancá-lo brutalmente enquanto ele tenta olhar para o buraco.", storyText, mostrarEscolhaErickyCratera);
+                                }, 3000);
+                            });
+                        }, 2000);
+                    });
+                }, 2000);
+            });
+        }
+
+        function mostrarEscolhaErickyCratera() {
+            const optionsContainer = document.getElementById('options-container');
+            const temArma = gameState.inventario.includes("Barra de Ferro") || gameState.inventario.includes("Pedaço de Madeira");
+            let classeAjudar = temArma ? "option-btn" : "option-btn locked";
+            let tooltipAjudar = temArma ? " (-1 Arma)" : " (Requer Arma: Ferro ou Madeira)";
+            optionsContainer.innerHTML = `
+                <button class="${classeAjudar}" onclick="resolverCrateraEricky('ajudar')">A. Tacar a arma de longe e salvar o desconhecido${tooltipAjudar}</button>
+                <button class="option-btn" onclick="resolverCrateraEricky('ignorar')">B. Não intervir</button>
+            `;
+            optionsContainer.classList.add('visible');
+        }
+
+        function resolverCrateraEricky(escolha) {
+            sfxClick();
+            const optionsContainer = document.getElementById('options-container');
+            const storyText = document.getElementById('story-text');
+            const continueBtn = document.getElementById('continue-btn');
+            optionsContainer.classList.remove('visible');
+            storyText.textContent = '';
+            if (escolha === 'ajudar') {
+                if (gameState.inventario.includes("Barra de Ferro")) gameState.inventario = gameState.inventario.filter(i => i !== "Barra de Ferro");
+                else gameState.inventario = gameState.inventario.filter(i => i !== "Pedaço de Madeira");
+                metaGame.erickyAjudouLeo = true; 
+                gameState.leoSalvo = true;
+                salvarProgresso(); // Salva decisão importante
+                digitarTexto("Você arremessa sua arma com toda força. Ela atinge um metal próximo com um estrondo alto.\n\nAssustados e achando que é a polícia ou um grupo maior, os bandidos fogem.\n\nO homem está desmaiado no chão, vivo, mas sozinho.\n(-1 Arma)", storyText, () => {
+                    continueBtn.onclick = retornoCasaDia2Ericky;
+                    continueBtn.textContent = "Voltar para casa (Noite 2)";
+                    continueBtn.style.display = 'block';
+                });
+            } else {
+                metaGame.erickyAjudouLeo = false;
+                gameState.leoStatus = 'frio';
+                salvarProgresso();
+                digitarTexto("Você fica imóvel, com medo de ser visto. Os bandidos continuam espancando o homem até cansarem.\n\nQuando eles vão embora, ele não se move por muito tempo. Ele sobrevive, mas algo nele morreu junto com ela hoje.\n(O desconhecido se torna frio)", storyText, () => {
+                    continueBtn.onclick = retornoCasaDia2Ericky;
+                    continueBtn.textContent = "Voltar para casa (Noite 2)";
+                    continueBtn.style.display = 'block';
+                });
+            }
+        }
+
+        function retornoCasaDia2Ericky() {
+            sfxClick();
+            const storyText = document.getElementById('story-text');
+            const continueBtn = document.getElementById('continue-btn');
+            continueBtn.style.display = 'none';
+            storyText.textContent = '';
+            digitarTexto("A noite cai pesada. Ericky retorna para os destroços de sua casa, com a imagem da cratera gravada na mente.", storyText, () => { mostrarOpcoesNoiteDia2Ericky(); });
+        }
+
+        function mostrarOpcoesNoiteDia2Ericky() {
+            const optionsContainer = document.getElementById('options-container');
+            let htmlOpcoes = `
+                <p style="margin-bottom: 10px; color: #888; font-family: 'Courier New';">A noite é longa. O que fazer?</p>
+                <button class="option-btn" onclick="finalizarDia2Ericky('luta')">Treinar luta (Saco de areia)</button>
+                <button class="option-btn" onclick="finalizarDia2Ericky('estudo')">Estudar livros de engenharia</button>
+                <button class="option-btn" onclick="finalizarDia2Ericky('dormir')">Dormir</button>
+            `;
+            if (!gameState.quartoVasculhado) {
+                htmlOpcoes += `<button class="option-btn" onclick="vasculharQuartoEricky()">Vasculhar o quarto</button>`;
+            }
+            optionsContainer.innerHTML = htmlOpcoes;
+            optionsContainer.classList.add('visible');
+        }
+
+        function vasculharQuartoEricky() {
+            sfxClick();
+            const optionsContainer = document.getElementById('options-container');
+            const storyText = document.getElementById('story-text');
+            const continueBtn = document.getElementById('continue-btn');
+            optionsContainer.classList.remove('visible');
+            storyText.textContent = '';
+            digitarTexto("No fundo de uma gaveta emperrada, você encontra uma foto antiga, levemente amassada.\n\nNela, um casal jovem sorri tirando uma selfie. O rapaz tem um olhar cheio de esperança e a garota encosta a cabeça no ombro dele.\n\nEram tempos mais simples.", storyText, () => {
+                continueBtn.textContent = "Guardar foto e voltar";
+                continueBtn.style.display = 'block';
+                continueBtn.onclick = () => {
+                    gameState.quartoVasculhado = true;
+                    continueBtn.style.display = 'none';
+                    mostrarOpcoesNoiteDia2Ericky();
+                };
+            });
+        }
+
+        function finalizarDia2Ericky(acao) {
+            sfxClick();
+            const optionsContainer = document.getElementById('options-container');
+            const storyText = document.getElementById('story-text');
+            optionsContainer.classList.remove('visible');
+            storyText.textContent = '';
+            if (acao === 'luta') {
+                gameState.experienciaCombate += 1;
+                digitarTexto("Ericky soca o saco de areia improvisado até os nós dos dedos sangrarem. A dor física abafa a dor mental.\n(+1 Exp Combate)", storyText, fimDoDia2Ericky);
+            } else if (acao === 'estudo') {
+                gameState.conhecimentoEngenharia += 1;
+                digitarTexto("Sob a luz fraca de uma vela, ele estuda diagramas estruturais. Entender como as coisas caem pode ajudar a entender como mantê-las em pé.\n(+1 Conhecimento Engenharia)", storyText, fimDoDia2Ericky);
+            } else {
+                digitarTexto("Ele se entrega ao sono imediatamente, exausto demais para pensar ou sentir qualquer coisa.", storyText, fimDoDia2Ericky);
+            }
+        }
+
+        function fimDoDia2Ericky() {
+            setTimeout(() => {
+                const storyText = document.getElementById('story-text');
+                digitarTexto("\n\nFIM DO DIA 2", storyText, () => { setTimeout(iniciarCapitulo3Ericky, 3000); });
+            }, 2000);
+        }
+
+        function iniciarCapitulo3Ericky() {
+            const storyText = document.getElementById('story-text');
+            storyText.textContent = '';
+            mostrarTituloCapitulo("CAPÍTULO 3 — “Suspeito”", () => {
+                digitarTexto("No meio da madrugada, Ericky escuta um barulho na sala.\n\nAlgo caiu.", storyText, () => {
+                    setTimeout(() => {
+                         digitarTexto("\n\nCom o coração acelerado, ele abre a porta do quarto devagar e vê alguém DENTRO da sua casa, movendo coisas.\n\nO invasor logo o vê, pula pela janela e foge.", storyText, () => {
+                             setTimeout(() => {
+                                 sfxThud();
+                                 digitarTexto("\n\nEricky reconhece: é o mesmo homem mascarado da outra noite.\nEle foi marcado. Se ficar, vai morrer.\n\nAo amanhecer, Ericky decide mudar de base.", storyText, mostrarOpcoesBaseEricky);
+                             }, 3000);
+                         });
+                    }, 2000);
+                });
+            });
+        }
+
+        function mostrarOpcoesBaseEricky() {
+            const optionsContainer = document.getElementById('options-container');
+            optionsContainer.innerHTML = `
+                <p style="margin-bottom: 10px; color: #888; font-family: 'Courier New';">Onde será a nova base?</p>
+                <button class="option-btn" onclick="tentarEscolherBaseRuimEricky('casa')">A. Casa de dois andares (Ocupada por viciados)</button>
+                <button class="option-btn" onclick="tentarEscolherBaseRuimEricky('escola')">B. Escola Municipal (Cheiro insuportável de corpos)</button>
+                <button class="option-btn" onclick="escolherNovaBaseEricky('mercado')">C. Mercado Abandonado</button>
+            `;
+            optionsContainer.classList.add('visible');
+        }
+
+        function tentarEscolherBaseRuimEricky(tipo) {
+            sfxClick();
+            const storyText = document.getElementById('story-text');
+            if (tipo === 'casa') storyText.textContent = "Você se aproxima, mas ouve vozes alteradas. O local está tomado por viciados violentos. Não dá para ficar aqui.";
+            else storyText.textContent = "O cheiro de decomposição é insuportável a 50 metros de distância. Impossível respirar lá dentro.";
+        }
+
+        function escolherNovaBaseEricky(base) {
+            sfxClick();
+            const optionsContainer = document.getElementById('options-container');
+            const storyText = document.getElementById('story-text');
+            optionsContainer.classList.remove('visible');
+            storyText.textContent = '';
+            digitarTexto("O mercado é pequeno, tem grades de ferro reforçadas e apenas uma entrada.\n\nÉ perfeito.\n\nEricky limpa o local e estabelece sua nova base.", storyText, () => setTimeout(iniciarCapitulo4Ericky, 3000));
+        }
+
+        function iniciarCapitulo4Ericky() {
+            const storyText = document.getElementById('story-text');
+            storyText.textContent = '';
+            mostrarTituloCapitulo("CAPÍTULO 4 — “Amigos ou Inimigos?”", () => {
+                digitarTexto("Duas semanas se passam.\n\nEricky não esquece aquela visão da cratera. Os bandidos frios simplesmente jogaram a mulher lá de cima.\n\nO que o mundo se tornou?", storyText, () => { setTimeout(verificarAlarmeEricky, 3000); });
+            });
+        }
+
+        function verificarAlarmeEricky() {
+            const storyText = document.getElementById('story-text');
+            storyText.textContent = "";
+            if (gameState.conhecimentoEngenharia > 0) {
+                digitarTexto("! \n\nBEEP! BEEP!\n\nO sistema de alarme com fios de nylon que ele instalou disparou. Ele tem vantagem.", storyText, () => setTimeout(cenaEncontroEricky, 3000));
+            } else {
+                digitarTexto("! \n\nCRASH!\nAlgo cai na entrada. Ericky acorda assustado.", storyText, () => setTimeout(cenaEncontroEricky, 3000));
+            }
+        }
+
+        function cenaEncontroEricky() {
+            const storyText = document.getElementById('story-text');
+            storyText.textContent = "";
+            digitarTexto("Atento, dessa vez ele não vai fugir.\n\nEle vai sorrateiramente e vê um homem na parte principal do mercado vasculhando as prateleiras.\n\nEstranhamente não é a mesma roupa do invasor anterior. Mesmo assim, Ericky ataca.", storyText, iniciarCombateEricky);
+        }
+
+        function iniciarCombateEricky() {
+            const optionsContainer = document.getElementById('options-container');
+            const temArma = gameState.inventario.includes("Barra de Ferro");
+            const textoAtaque = temArma ? "Atacar com Barra de Ferro" : "Atacar com os punhos";
+            optionsContainer.innerHTML = `
+                <button class="option-btn" onclick="combateRound1Ericky('${temArma ? 'ferro' : 'punhos'}')">${textoAtaque}</button>
+                <button class="option-btn" onclick="combateRound1Ericky('furtivo')">Tentar imobilizar por trás</button>
+            `;
+            optionsContainer.classList.add('visible');
+        }
+
+        function combateRound1Ericky(tipo) {
+            sfxClick();
+            const optionsContainer = document.getElementById('options-container');
+            const storyText = document.getElementById('story-text');
+            optionsContainer.classList.remove('visible');
+            storyText.textContent = "";
+            if (tipo === 'ferro') digitarTexto("Você golpeia com o ferro visando a perna do invasor. Ele prevê o movimento e salta para o lado com agilidade impressionante.", storyText, proximoRoundEricky);
+            else if (tipo === 'punhos') digitarTexto("Você avança para um soco direto. O homem desvia a cabeça milímetros antes do impacto.", storyText, proximoRoundEricky);
+            else digitarTexto("Você tenta agarrá-lo. Ele gira o corpo e te empurra contra uma estante de enlatados.", storyText, proximoRoundEricky);
+        }
+
+        function proximoRoundEricky() {
+            setTimeout(() => {
+                const optionsContainer = document.getElementById('options-container');
+                optionsContainer.innerHTML = `
+                    <button class="option-btn" onclick="combateRound2Ericky()">Chutar</button>
+                    <button class="option-btn" onclick="combateRound2Ericky()">Recuar e defender</button>
+                `;
+                optionsContainer.classList.add('visible');
+            }, 2000);
+        }
+
+        function combateRound2Ericky() {
+            sfxClick();
+            const optionsContainer = document.getElementById('options-container');
+            const storyText = document.getElementById('story-text');
+            optionsContainer.classList.remove('visible');
+            storyText.textContent = "";
+            sfxThud();
+            digitarTexto("O homem é experiente. Ele bloqueia seu movimento e te derruba no chão com uma rasteira técnica.\n\nVocê perdeu o controle da luta.", storyText, revelacaoLeoEricky);
+        }
+
+        function revelacaoLeoEricky() {
+            setTimeout(() => {
+                const storyText = document.getElementById('story-text');
+                storyText.textContent = "";
+                digitarTexto("Ofegante, o homem levanta as mãos em sinal de paz, embora tenha vantagem.\n\n— Calma! Eu não quero te machucar. Só preciso de comida.\n\nEle tira a máscara.\n\nEricky reconhece imediatamente. É o mesmo homem da cratera.", storyText, dialogoCrateraEricky);
+            }, 3000);
+        }
+
+        function dialogoCrateraEricky() {
+            const optionsContainer = document.getElementById('options-container');
+            optionsContainer.innerHTML = `
+                <button class="option-btn" onclick="respostaLeoEricky('sim')">"Eu vi você na cratera."</button>
+                <button class="option-btn" onclick="respostaLeoEricky('nao')">Não dizer nada.</button>
+            `;
+            optionsContainer.classList.add('visible');
+        }
+
+        function respostaLeoEricky(resp) {
+            sfxClick();
+            const optionsContainer = document.getElementById('options-container');
+            const storyText = document.getElementById('story-text');
+            optionsContainer.classList.remove('visible');
+            storyText.textContent = "";
+            if (resp === 'sim') {
+                if (gameState.leoSalvo) {
+                    gameState.relacionamentoLeo += 2;
+                    digitarTexto("— Foi você... — Os olhos do estranho se arregalam. — Você jogou aquele ferro. Você me salvou.\n\n(Laço fortalecido)", storyText, dialogoFinalEricky);
+                } else {
+                    gameState.relacionamentoLeo -= 2;
+                    digitarTexto("— Você viu? — O estranho fecha a cara. — E ficou olhando enquanto me espancavam?\n\nEle cospe no chão, irritado.\n(Laço enfraquecido)", storyText, dialogoFinalEricky);
+                }
+            } else {
+                digitarTexto("Ericky permanece em silêncio.\n\n— Olha, eu vou pegar duas latas e vou embora. Só isso. — diz o homem.", storyText, dialogoFinalEricky);
+            }
+        }
+
+        function dialogoFinalEricky() {
+            setTimeout(() => {
+                const storyText = document.getElementById('story-text');
+                const continueBtn = document.getElementById('continue-btn');
+                storyText.textContent = "";
+                digitarTexto("Eles conversam pouco. O estranho parece exausto.\n\nEricky, por precaução, aponta para um depósito vazio nos fundos.\n\n— Você dorme lá. Trancado.\n\nO homem aceita sem reclamar.", storyText, () => {
+                    continueBtn.textContent = "Finalizar Parte 1 (Desbloquear Rota do Leo)";
+                    continueBtn.style.display = 'block';
+                    continueBtn.onclick = fimDeJogoEricky;
+                });
+            }, 4000);
+        }
+
+        function fimDeJogoEricky() {
+            sfxClick();
+            document.getElementById('story-screen').classList.remove('show');
+            gameState.erickyFinalizado = true;
+            metaGame.erickyJogou = true;
+            metaGame.leoDesbloqueado = true;
+            salvarProgresso();
+            atualizarInterfaceMenu();
+
+            const sel = document.getElementById('selection-screen');
+            sel.style.display = 'flex';
+            setTimeout(() => sel.classList.remove('fade-out'), 100);
+        }
+
+        // ============================================================
+        // ==================== ROTA DO LEO ==========================
+        // ============================================================
+
+        function iniciarRotaLeo() {
+            const storyText = document.getElementById('story-text');
+            digitarTexto("07.24.2034", storyText, () => {
+                setTimeout(() => {
+                    storyText.textContent = "";
+                    digitarTexto("Leo estava trabalhando quando o chão começou a vibrar. Rapidamente saiu de sua empresa, junto aos outros funcionários.\n\nTudo começou a desabar, viu pessoas caindo em crateras, acidentes, o que estava acontecendo?", storyText, () => {
+                        setTimeout(() => {
+                            digitarTexto("\n\nA tempo conseguiu pegar seu carro e ir dirigindo para casa o mais rápido possível, evitando colisões e vendo o caos.", storyText, () => {
+                                setTimeout(() => {
+                                    storyText.textContent = "";
+                                    digitarTexto("Quando chegou em casa...\n\nNão havia nada. Onde era sua casa, virou uma enorme cratera do tamanho de um estádio de futebol.", storyText, () => {
+                                        setTimeout(() => {
+                                            digitarTexto("\n\nLeo saiu o mais rápido possível, antes que ela aumentasse.", storyText, () => {
+                                                setTimeout(irCasaLorena, 4000);
+                                            });
+                                        }, 3000);
+                                    });
+                                }, 4000);
+                            });
+                        }, 4000);
+                    });
+                }, 2000);
+            });
+        }
+
+        function irCasaLorena() {
+            const storyText = document.getElementById('story-text');
+            storyText.textContent = "";
+            digitarTexto("Leo não sabia para onde ir, mas lembrou da sua namorada. Foi rapidamente até a casa dela, que estava quase intacta, porém com as portas e janelas destruídas.", storyText, mostrarOpcoesExploracaoLeo);
+        }
+
+        function mostrarOpcoesExploracaoLeo() {
+            const optionsContainer = document.getElementById('options-container');
+            optionsContainer.innerHTML = `
+                <p style="margin-bottom: 10px; color: #888;">Investigar:</p>
+                <button class="option-btn" onclick="explorarCasaLorena('banheiro_sala')">Banheiro da sala</button>
+                <button class="option-btn" onclick="explorarCasaLorena('quarto_hospedes')">Quarto de hóspedes</button>
+                <button class="option-btn" onclick="explorarCasaLorena('cozinha')">Cozinha</button>
+                <button class="option-btn" onclick="explorarCasaLorena('banheiro_quarto')">Banheiro do quarto</button>
+            `;
+            optionsContainer.classList.add('visible');
+        }
+
+        function explorarCasaLorena(local) {
+            sfxClick();
+            const storyText = document.getElementById('story-text');
+            const optionsContainer = document.getElementById('options-container');
+            optionsContainer.classList.remove('visible');
+            storyText.textContent = "";
+
+            if (local === 'banheiro_sala') digitarTexto("Leo verifica o banheiro da sala. Nada.", storyText, mostrarOpcoesExploracaoLeo);
+            else if (local === 'cozinha') digitarTexto("A cozinha está revirada. Nada.", storyText, mostrarOpcoesExploracaoLeo);
+            else if (local === 'quarto_hospedes') {
+                if (!gameState.inventario.includes("Lanterna")) {
+                    gameState.inventario.push("Lanterna");
+                    digitarTexto("No quarto de hóspedes, Leo encontra uma lanterna.\n(Item: Lanterna)", storyText, mostrarOpcoesExploracaoLeo);
+                } else digitarTexto("O quarto está vazio.", storyText, mostrarOpcoesExploracaoLeo);
+            } else if (local === 'banheiro_quarto') encontroLorena();
+        }
+
+        function encontroLorena() {
+            const storyText = document.getElementById('story-text');
+            digitarTexto("Ao adentrar no banheiro do quarto, Lorena quase corta sua cabeça com um facão, mas ela para antes de chegar ao seu pescoço.", storyText, () => {
+                sfxThud();
+                setTimeout(() => {
+                    digitarTexto("\n\n'LEO! pensei que estivesse morto'\n\nEles se abraçam e ela pergunta o que está acontecendo. Leo diz que não sabe e não tem pra onde ir.", storyText, () => {
+                        setTimeout(dialogoLorena, 4000);
+                    });
+                }, 1000);
+            });
+        }
+
+        function dialogoLorena() {
+            const storyText = document.getElementById('story-text');
+            storyText.textContent = "";
+            digitarTexto("Leo pergunta pq ela estava escondida.\n\nLorena diz que durante o caos, começaram a invadir casas, e a dela foi uma das escolhidas, homens foram lá e levaram tudo. Ela se escondeu para se proteger.", storyText, decisaoAbrigoLeo);
+        }
+
+        function decisaoAbrigoLeo() {
+            const optionsContainer = document.getElementById('options-container');
+            optionsContainer.innerHTML = `
+                <p style="margin-bottom: 10px; color: #888; font-family: 'Courier New';">O que fazer?</p>
+                <button class="option-btn" onclick="resolverAbrigoLeo('ficar')">Ficar e consertar portas/janelas</button>
+                <button class="option-btn" onclick="resolverAbrigoLeo('sair')">Sair e procurar abrigo mais seguro</button>
+            `;
+            optionsContainer.classList.add('visible');
+        }
+
+        function resolverAbrigoLeo(escolha) {
+            sfxClick();
+            const optionsContainer = document.getElementById('options-container');
+            const storyText = document.getElementById('story-text');
+            optionsContainer.classList.remove('visible');
+            storyText.textContent = "";
+
+            if (escolha === 'ficar') digitarTexto("Eles ficam e tentam consertar o lugar.", storyText, eventoRadioLeo);
+            else digitarTexto("Eles saem e encontram abrigo numa casa abandonada.", storyText, eventoRadioLeo);
+        }
+
+        function eventoRadioLeo() {
+            setTimeout(() => {
+                const storyText = document.getElementById('story-text');
+                digitarTexto("\n\n3 dias após o primeiro estrondo, o rádio começa a chiar.\n\nUma voz militar diz: '...população sobrevivente... dirijam-se ao T5...'", storyText, () => {
+                    setTimeout(leoCapitulo2, 4000);
+                });
+            }, 2000);
+        }
+
+        function leoCapitulo2() {
+            const storyText = document.getElementById('story-text');
+            storyText.textContent = "";
+            mostrarTituloCapitulo("CAPÍTULO 2 — “Visitante Noturno”", () => {
+                digitarTexto("Após escutar o rádio eles decidem ir de manhã ao T5. Eles dormem.\n\nLeo acorda durante a madrugada, com uma sensação ruim. Ele vira em direção a porta.", storyText, () => {
+                    setTimeout(() => {
+                        digitarTexto("\n\nUm homem mascarado o observa pela fresta da porta, imóvel. Leo trava.\n\nO homem puxa a maçaneta e fecha a porta.", storyText, () => {
+                            setTimeout(() => {
+                                digitarTexto("\n\nLeo destrava, acorda Lorena e corre pegando a coisa mais afiada que havia por ali, abre a porta, e não havia mais ninguém apenas os móveis destruídos e a porta aberta com o vento sobre a cortina.", storyText, () => {
+                                    setTimeout(leoCapitulo3, 4000);
+                                });
+                            }, 3000);
+                        });
+                    }, 2000);
+                });
+            });
+        }
+
+        function leoCapitulo3() {
+            const storyText = document.getElementById('story-text');
+            storyText.textContent = "";
+            mostrarTituloCapitulo("CAPÍTULO 3 — “Caminho Sem Volta”", () => {
+                digitarTexto("Ao amanhecer, eles acham que indo pelo Shopping Grande Circular é a melhor opção.\n\nNo caminho, eles passam pelo Baratão da Carne, veem uma movimentação suspeita.", storyText, mostrarOpcoesLootLeo);
+            });
+        }
+
+        function mostrarOpcoesLootLeo() {
+            const optionsContainer = document.getElementById('options-container');
+            optionsContainer.innerHTML = `
+                <button class="option-btn" onclick="lootLeo('mercado')">Investigar Mercado Abandonado</button>
+                <button class="option-btn" onclick="lootLeo('onibus')">Investigar Ônibus 640</button>
+                <button class="option-btn" onclick="lootLeo('seguir')">Seguir direto</button>
+            `;
+            optionsContainer.classList.add('visible');
+        }
+
+        function lootLeo(local) {
+            sfxClick();
+            const optionsContainer = document.getElementById('options-container');
+            const storyText = document.getElementById('story-text');
+            optionsContainer.classList.remove('visible');
+            storyText.textContent = "";
+
+            let txt = "";
+            if (local === 'mercado') {
+                if (metaGame.erickyPegouIsqueiro) txt = "O mercado está revirado. Alguém já esteve aqui.";
+                else txt = "Em meio ao lixo, Leo encontra um isqueiro funcional.";
+            } else if (local === 'onibus') {
+                if (metaGame.erickyPegouFerro) txt = "O ônibus foi vasculhado. Só destroços.";
+                else {
+                    txt = "Leo encontra uma barra de ferro e uma moeda.";
+                    gameState.inventario.push("Barra de Ferro", "Moeda");
+                }
+            } else {
+                txt = "Eles decidem não arriscar e continuam andando.";
+            }
+            digitarTexto(txt, storyText, () => setTimeout(leoCratera, 3000));
+        }
+
+        function leoCratera() {
+            const storyText = document.getElementById('story-text');
+            storyText.textContent = "";
+            digitarTexto("Chegando próximo ao Mercado Vitória, veem uma grande cratera, muito silêncio, algo vai acontecer.", storyText, () => {
+                setTimeout(() => {
+                    digitarTexto("\n\nEles veem 3 homens se aproximando, dão meia volta e veem mais dois vindo por trás.\nEncurralados e sabendo que aqueles homens não estão querendo amizade.", storyText, mostrarAcaoLeoCratera);
+                }, 3000);
+            });
+        }
+
+        function mostrarAcaoLeoCratera() {
+            const optionsContainer = document.getElementById('options-container');
+            optionsContainer.innerHTML = `
+                <button class="option-btn" onclick="resultadoCrateraLeo()">Fugir</button>
+                <button class="option-btn" onclick="resultadoCrateraLeo()">Lutar</button>
+            `;
+            optionsContainer.classList.add('visible');
+        }
+
+        function resultadoCrateraLeo() {
+            sfxClick();
+            const optionsContainer = document.getElementById('options-container');
+            const storyText = document.getElementById('story-text');
+            optionsContainer.classList.remove('visible');
+            storyText.textContent = "";
+
+            digitarTexto("Eles acabam encurralados na cratera. São brutalmente espancados e postos na beira da cratera.", storyText, () => {
+                sfxThud();
+                setTimeout(() => {
+                    digitarTexto("\n\nLeo pede misericórdia, mas eles não ligam.\nCom um golpe rápido, um dos bandidos joga Lorena de cima da cratera, morrendo na hora.", storyText, () => {
+                        setTimeout(() => {
+                            digitarTexto("\n\nLeo em choque grita desesperado e tenta lutar, mas é facilmente imobilizado.", storyText, verificarIntervencao);
+                        }, 3000);
+                    });
+                }, 3000);
+            });
+        }
+
+        function verificarIntervencao() {
+            const storyText = document.getElementById('story-text');
+            let erickyAjuda = metaGame.erickyAjudouLeo; 
+
+            setTimeout(() => {
+                if (erickyAjuda) {
+                    digitarTexto("\n\nDE REPENTE! Um barulho de metal. Alguém na passarela jogou uma barra de ferro nos bandidos!\n\nAssustados, eles fogem. Leo é salvo por um misterioso desconhecido.", storyText, () => {
+                        setTimeout(leoBiblioteca, 4000);
+                    });
+                } else {
+                    digitarTexto("\n\nNinguém vem ajudar. Os bandidos espancam Leo até cansarem e vão embora.\nLeo desmaia.", storyText, () => {
+                        setTimeout(leoBiblioteca, 4000);
+                    });
+                }
+            }, 3000);
+        }
+
+        function leoBiblioteca() {
+            const storyText = document.getElementById('story-text');
+            storyText.textContent = "";
+            digitarTexto("Leo acorda confuso, ainda em choque, molhado pela chuva que estava acontecendo, era noite.\n\nLeo adentra uma biblioteca e lá se instala.", storyText, mostrarOpcoesBiblioteca);
+        }
+
+        function mostrarOpcoesBiblioteca() {
+            const optionsContainer = document.getElementById('options-container');
+            optionsContainer.innerHTML = `
+                <p style="margin-bottom: 10px; color: #888;">Ler livros sobre:</p>
+                <button class="option-btn" onclick="escolhaLivroLeo('engenharia')">Engenharia</button>
+                <button class="option-btn" onclick="escolhaLivroLeo('luta')">Luta</button>
+                <button class="option-btn" onclick="escolhaLivroLeo('culinaria')">Culinária</button>
+            `;
+            optionsContainer.classList.add('visible');
+        }
+
+        function escolhaLivroLeo(tipo) {
+            sfxClick();
+            const optionsContainer = document.getElementById('options-container');
+            const storyText = document.getElementById('story-text');
+            optionsContainer.classList.remove('visible');
+            storyText.textContent = "";
+            
+            if (tipo === 'luta') gameState.experienciaCombate += 2;
+            if (tipo === 'engenharia') gameState.conhecimentoEngenharia += 2;
+
+            digitarTexto("Leo passa o tempo lendo e sobrevivendo.\n\n2 SEMANAS SE PASSAM.", storyText, () => {
+                setTimeout(leoTimeJump, 3000);
+            });
+        }
+
+        function leoTimeJump() {
+            const storyText = document.getElementById('story-text');
+            storyText.textContent = "";
+            digitarTexto("Leo agora usa uma máscara, passou esse tempo todo matando quem estivesse em seu caminho.\nA máscara suja de sangue.\n\nPorém, a fome. Não havia nada para comer. Ele procura em todos os lugares. Nada.\n\nEle acha um mercado fechado.", storyText, mostrarInvasaoMercado);
+        }
+
+        function mostrarInvasaoMercado() {
+            const optionsContainer = document.getElementById('options-container');
+            optionsContainer.innerHTML = `
+                <button class="option-btn" onclick="invasaoMercado('janela')">Quebrar janela</button>
+                <button class="option-btn" onclick="invasaoMercado('porta')">Arrombar porta</button>
+            `;
+            optionsContainer.classList.add('visible');
+        }
+
+        function invasaoMercado(metodo) {
+            sfxClick();
+            const optionsContainer = document.getElementById('options-container');
+            const storyText = document.getElementById('story-text');
+            optionsContainer.classList.remove('visible');
+            storyText.textContent = "";
+
+            if (metodo === 'porta') {
+                if (Math.random() > 0.5) digitarTexto("A porta não cede. Leo quebra a janela.", storyText, () => entradaMercado(true));
+                else digitarTexto("A porta cede.", storyText, () => entradaMercado(false));
+            } else {
+                digitarTexto("Leo quebra o vidro.", storyText, () => entradaMercado(true));
+            }
+        }
+
+        function entradaMercado(ferido) {
+            const storyText = document.getElementById('story-text');
+            if (ferido) gameState.saude -= 10;
+            setTimeout(() => {
+                digitarTexto("\n\nAo entrar, começa a saquear, bastante coisa, água, comida.\nSem querer Leo derruba uma lata.\n\n'Acho que ninguém ouviu'.\n\nDE REPENTE!", storyText, () => setTimeout(leoCapitulo4Final, 2000));
+            }, 1000);
+        }
+
+        function leoCapitulo4Final() {
+            const storyText = document.getElementById('story-text');
+            storyText.textContent = "";
+            mostrarTituloCapitulo("CAPÍTULO 4 — “Inimigos ou Amigos?”", () => {
+                digitarTexto("Alguém surge e ataca Leo! É um homem jovem (Ericky).", storyText, iniciarCombateLeo);
+            });
+        }
+
+        function iniciarCombateLeo() {
+            const optionsContainer = document.getElementById('options-container');
+            optionsContainer.innerHTML = `
+                <button class="option-btn" onclick="combateLeoRound1()">Contra-atacar</button>
+                <button class="option-btn" onclick="combateLeoRound1()">Esquivar</button>
+            `;
+            optionsContainer.classList.add('visible');
+        }
+
+        function combateLeoRound1() {
+            sfxClick();
+            const optionsContainer = document.getElementById('options-container');
+            const storyText = document.getElementById('story-text');
+            optionsContainer.classList.remove('visible');
+            storyText.textContent = "";
+            digitarTexto("Leo prevê o movimento. Bloqueia e derruba o garoto.", storyText, finalLeo);
+        }
+
+        function finalLeo() {
+            const continueBtn = document.getElementById('continue-btn');
+            const storyText = document.getElementById('story-text');
+            setTimeout(() => {
+                digitarTexto("\n\nLeo tira a máscara. O garoto o reconhece.\nEricky tranca Leo num depósito.\n\nLeo se sente incomodado por estar sendo trancado, porém ele não liga e caso Ericky tente fazer algo, ele já sabe como sair.", storyText, () => {
+                    continueBtn.textContent = "Fim da Parte 2";
+                    continueBtn.style.display = 'block';
+                    continueBtn.onclick = fimDeJogoLeo;
+                });
+            }, 2000);
+        }
+
+        function fimDeJogoLeo() {
+            sfxClick();
+            document.getElementById('story-screen').classList.remove('show');
+            metaGame.leoJogou = true;
+            salvarProgresso();
+            atualizarInterfaceMenu();
+
+            const sel = document.getElementById('selection-screen');
+            sel.style.display = 'flex';
+            setTimeout(() => sel.classList.remove('fade-out'), 100);
+        }
+    </script>
+</body>
+</html>
