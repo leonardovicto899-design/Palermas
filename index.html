@@ -6,16 +6,30 @@
     <title>Palermas</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background-color: #000; font-family: 'Arial', sans-serif; font-weight: 300; overflow-x: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; color: white; }
+        body { background-color: #000; font-family: 'Arial', sans-serif; font-weight: 300; overflow-x: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; color: white; user-select: none; }
         .screen { position: absolute; width: 100%; height: 100vh; display: flex; justify-content: center; align-items: center; transition: transform 0.8s ease, opacity 0.8s ease; opacity: 1; }
         .screen.slide-from-right { transform: translateX(100%); }
         .screen.active { transform: translateX(0); opacity: 1; }
         .screen.fade-out { opacity: 0; pointer-events: none; }
         
-        #story-screen { display: none; flex-direction: column; justify-content: flex-start; align-items: flex-start; padding: 40px; z-index: 50; width: 100%; max-width: 800px; }
+        #story-screen { display: none; flex-direction: column; justify-content: flex-start; align-items: flex-start; padding: 40px; z-index: 50; width: 100%; max-width: 800px; cursor: pointer; }
         #story-screen.show { display: flex; }
         #story-text { font-family: 'Courier New', Courier, monospace; font-size: 1.2rem; line-height: 1.6; white-space: pre-wrap; min-height: 100px; }
         
+        /* Indicador de Próximo Texto (Seta Piscando) */
+        #next-indicator {
+            display: none;
+            color: #fff;
+            font-size: 1.5rem;
+            margin-top: 10px;
+            animation: bounce 1s infinite;
+            align-self: flex-end; /* Fica no canto direito do texto */
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); opacity: 1; }
+            50% { transform: translateY(5px); opacity: 0.5; }
+        }
+
         #chapter-title { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-family: 'Courier New', Courier, monospace; font-size: 2rem; text-align: center; opacity: 0; transition: opacity 1.5s ease; z-index: 60; pointer-events: none; }
         #chapter-title.visible { opacity: 1; }
         
@@ -29,6 +43,22 @@
         #continue-btn { display: none; margin-top: 30px; background-color: transparent; color: #fff; border: 1px solid #fff; padding: 10px 30px; font-family: 'Courier New', Courier, monospace; cursor: pointer; align-self: flex-start; }
         #continue-btn:hover { background-color: #fff; color: #000; }
         
+        /* Botão de Resetar Save */
+        .reset-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: transparent;
+            border: 1px solid #444;
+            color: #666;
+            font-size: 0.8rem;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            transition: all 0.3s;
+        }
+        .reset-btn:hover { border-color: #f00; color: #f00; }
+
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.95); justify-content: center; align-items: center; z-index: 1000; }
         .modal.show { display: flex; }
         .modal-content { display: flex; flex-direction: column; align-items: center; gap: 30px; }
@@ -64,79 +94,19 @@
         #btn-gabriel.unlocked:hover { background-color: #ff4444; color: #000; }
         #btn-gabriel.unlocked::after { background-color: #ff4444; }
 
-        /* Tooltip "Em produção" */
-        .player-btn[data-tooltip]:hover::before {
-            content: attr(data-tooltip);
-            position: absolute;
-            top: -40px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #fff;
-            color: #000;
-            padding: 5px 10px;
-            font-size: 0.8rem;
-            font-weight: bold;
-            border-radius: 0;
-            white-space: nowrap;
-            opacity: 1;
-            pointer-events: none;
-            border: 1px solid #000;
-        }
-        .player-btn[data-tooltip]:hover::after {
-            content: ''; 
-            position: absolute;
-            top: -10px;
-            left: 50%;
-            transform: translateX(-50%);
-            border-width: 5px;
-            border-style: solid;
-            border-color: #fff transparent transparent transparent;
-        }
-        .player-btn.unlocked[data-tooltip]:hover::after {
-            content: ''; 
-            position: absolute;
-            right: 30px;
-            top: 50%;
-            left: auto;
-            transform: translateY(-50%);
-            width: 8px;
-            height: 8px;
-            background-color: #000;
-            border-radius: 50%;
-            border: none;
-        }
+        .player-btn[data-tooltip]:hover::before { content: attr(data-tooltip); position: absolute; top: -40px; left: 50%; transform: translateX(-50%); background: #fff; color: #000; padding: 5px 10px; font-size: 0.8rem; font-weight: bold; border-radius: 0; white-space: nowrap; opacity: 1; pointer-events: none; border: 1px solid #000; }
+        .player-btn[data-tooltip]:hover::after { content: ''; position: absolute; top: -10px; left: 50%; transform: translateX(-50%); border-width: 5px; border-style: solid; border-color: #fff transparent transparent transparent; }
+        .player-btn.unlocked[data-tooltip]:hover::after { content: ''; position: absolute; right: 30px; top: 50%; left: auto; transform: translateY(-50%); width: 8px; height: 8px; background-color: #000; border-radius: 50%; border: none; }
         
         .help-btn { position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; background-color: transparent; color: #fff; border: 1px solid #fff; border-radius: 50%; font-size: 2rem; font-weight: 300; cursor: pointer; transition: all 0.3s ease; display: flex; justify-content: center; align-items: center; }
         .help-btn:hover { background-color: #fff; color: #000; }
         .back-btn { position: fixed; top: 30px; left: 30px; background-color: transparent; color: #fff; border: 1px solid #fff; padding: 10px 30px; font-size: 1rem; font-weight: 300; cursor: pointer; transition: all 0.3s ease; letter-spacing: 0.05em; }
         .back-btn:hover { background-color: #fff; color: #000; }
         
-        .skip-hint {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            color: #444;
-            font-size: 0.8rem;
-            font-family: 'Courier New', Courier, monospace;
-            pointer-events: none;
-            opacity: 0.5;
-        }
+        .skip-hint { position: fixed; bottom: 10px; right: 10px; color: #444; font-size: 0.8rem; font-family: 'Courier New', Courier, monospace; pointer-events: none; opacity: 0.5; }
         
-        /* Bolhas do 67 */
-        .bubble-67 {
-            position: fixed;
-            bottom: -50px;
-            color: #ffeb3b;
-            font-family: 'Courier New', monospace;
-            font-weight: bold;
-            pointer-events: none;
-            z-index: 9999;
-            animation: floatUp 4s linear forwards;
-        }
-        @keyframes floatUp {
-            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
-            100% { transform: translateY(-110vh) rotate(360deg); opacity: 0; }
-        }
+        .bubble-67 { position: fixed; bottom: -50px; color: #ffeb3b; font-family: 'Courier New', monospace; font-weight: bold; pointer-events: none; z-index: 9999; animation: floatUp 4s linear forwards; }
+        @keyframes floatUp { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(-110vh) rotate(360deg); opacity: 0; } }
     </style>
 </head>
 <body>
@@ -150,10 +120,12 @@
     <div id="selection-screen" class="screen slide-from-right">
         <button class="back-btn" onclick="voltar()">Voltar</button>
         
+        <!-- Botão de Resetar Save -->
+        <button class="reset-btn" onclick="resetarSave()">Apagar Save</button>
+
         <button id="btn-ericky" class="player-btn unlocked" onclick="iniciarHistoria('ericky')">Ericky</button>
         <button id="btn-leo" class="player-btn locked-char" onclick="iniciarHistoria('leo')">Leo</button> 
         <button id="btn-gabriel" class="player-btn locked-char" onclick="iniciarHistoria('gabriel')">Gabriel</button>
-        
         <button id="btn-isaque" class="player-btn locked-char" data-tooltip="Em produção">Isaque</button>
         <button id="btn-vitor" class="player-btn locked-char" data-tooltip="Em produção">Vitor</button>
         <button class="help-btn" onclick="abrirModal()">?</button>
@@ -163,9 +135,10 @@
 
     <div id="story-screen" class="screen">
         <div id="story-text"></div>
+        <div id="next-indicator">▼</div>
         <div id="options-container"></div>
         <button id="continue-btn">Continuar</button>
-        <div class="skip-hint">Pressione [→] para avançar</div>
+        <div class="skip-hint">Clique ou [→] para avançar</div>
     </div>
 
     <div id="code-modal" class="modal">
@@ -200,11 +173,20 @@
             erickyViuCratera: false,
             leoDesbloqueado: false,
             leoJogou: false,
-            codigoCassinoAtivo: false
+            codigoCassinoAtivo: false,
+            erickyEntrouClube5: false
         };
 
         function salvarProgresso() {
             localStorage.setItem(SAVE_KEY, JSON.stringify(metaGame));
+        }
+
+        function resetarSave() {
+            sfxClick();
+            if(confirm("Tem certeza? Isso apagará todo o seu progresso no jogo e reiniciará a página.")) {
+                localStorage.removeItem(SAVE_KEY);
+                location.reload();
+            }
         }
 
         function carregarProgresso() {
@@ -280,7 +262,32 @@
         function abrirModal() { sfxClick(); document.getElementById('code-modal').classList.add('show'); document.getElementById('secret-code-input').focus(); }
         function fecharModal() { sfxClick(); document.getElementById('code-modal').classList.remove('show'); }
         
-        // --- PIADA 67 ---
+        function verificarCodigo() {
+            sfxClick();
+            const input = document.getElementById('secret-code-input');
+            const codigo = input.value.toUpperCase().trim();
+            
+            if (codigo === "CASSINO") { 
+                alert("Segredo Revelado: Rota de Gabriel visível");
+                metaGame.codigoCassinoAtivo = true;
+                salvarProgresso();
+                atualizarInterfaceMenu();
+                fecharModal();
+            } else if (codigo === "LIBERAR") { 
+                alert("CHEAT: Tudo Liberado");
+                metaGame.erickyJogou = true;
+                metaGame.leoJogou = true;
+                metaGame.leoDesbloqueado = true;
+                salvarProgresso();
+                atualizarInterfaceMenu();
+                fecharModal();
+            } else if (codigo === "67") {
+                trigger67Joke();
+            } else { 
+                alert("Código Inválido"); input.value = ""; input.focus(); 
+            }
+        }
+
         function trigger67Joke() {
             fecharModal();
             const count = 50; 
@@ -298,52 +305,29 @@
             }
         }
 
-        function verificarCodigo() {
-            sfxClick();
-            const input = document.getElementById('secret-code-input');
-            const codigo = input.value.toUpperCase().trim();
-            
-            if (codigo === "CASSINO") { 
-                alert("Segredo Revelado: Rota de Gabriel visível");
-                metaGame.codigoCassinoAtivo = true;
-                salvarProgresso();
-                atualizarInterfaceMenu();
-                fecharModal();
-            } else if (codigo === "RESET") {
-                if(confirm("Apagar todo o progresso?")) {
-                    localStorage.removeItem(SAVE_KEY);
-                    location.reload();
-                }
-            } else if (codigo === "LIBERAR") { 
-                alert("CHEAT: Tudo Liberado");
-                metaGame.erickyJogou = true;
-                metaGame.leoJogou = true;
-                metaGame.leoDesbloqueado = true;
-                salvarProgresso();
-                atualizarInterfaceMenu();
-                fecharModal();
-            } else if (codigo === "67") {
-                trigger67Joke();
-            } else { 
-                alert("Código Inválido"); input.value = ""; input.focus(); 
-            }
-        }
-
         document.getElementById('secret-code-input').addEventListener('keypress', function (e) { if (e.key === 'Enter') verificarCodigo(); });
         document.getElementById('code-modal').addEventListener('click', function(e) { if (e.target === this) fecharModal(); });
 
-        let typingState = { timer: null, text: '', element: null, fn: null, active: false };
+        // --- SISTEMA DE DIGITAÇÃO E AVANÇO MANUAL ---
+        let typingState = { timer: null, text: '', element: null, fn: null, active: false, waiting: false };
 
         function digitarTexto(texto, elemento, callback) {
+            // Se já estiver esperando, ignora (ou resolve o anterior se for chamado forçado)
             if (typingState.active) {
                 clearTimeout(typingState.timer);
                 if (typingState.element) typingState.element.textContent = typingState.text;
-                if (typingState.fn) typingState.fn();
             }
+
+            // Limpa indicador anterior se houver
+            document.getElementById('next-indicator').style.display = 'none';
+            typingState.waiting = false;
+
             typingState.active = true;
             typingState.text = texto;
             typingState.element = elemento;
             typingState.fn = callback;
+
+            elemento.textContent = ''; // Limpa texto anterior visualmente se for novo bloco
 
             let i = 0;
             const parteLenta = "e . . .";
@@ -351,6 +335,7 @@
 
             function type() {
                 if (!typingState.active) return;
+
                 if (i < texto.length) {
                     const char = texto.charAt(i);
                     elemento.textContent += char;
@@ -361,26 +346,55 @@
                     if (texto.charAt(i-1) === '.') delay += 150;
                     typingState.timer = setTimeout(type, delay);
                 } else {
+                    // Terminou de digitar
                     typingState.active = false;
-                    if (callback) callback();
+                    // Se tiver callback (próxima ação), espera input
+                    if (callback) {
+                        typingState.waiting = true;
+                        document.getElementById('next-indicator').style.display = 'block';
+                    }
                 }
             }
             type();
         }
 
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowRight') {
-                if (typingState.active) {
-                    clearTimeout(typingState.timer);
-                    typingState.element.textContent = typingState.text;
-                    typingState.active = false;
-                    if (typingState.fn) typingState.fn();
-                } else {
-                    const continueBtn = document.getElementById('continue-btn');
-                    if (continueBtn && continueBtn.style.display !== 'none') continueBtn.click();
+        // Listener Global para Avançar
+        function handleInteraction() {
+            if (typingState.active) {
+                // Pular digitação
+                clearTimeout(typingState.timer);
+                if (typingState.element) typingState.element.textContent = typingState.text;
+                typingState.active = false;
+                
+                // Se tiver callback, agora espera o próximo clique para continuar
+                if (typingState.fn) {
+                    typingState.waiting = true;
+                    document.getElementById('next-indicator').style.display = 'block';
+                }
+            } else if (typingState.waiting) {
+                // Avançar para o próximo bloco
+                sfxClick(); // Som de confirmação
+                typingState.waiting = false;
+                document.getElementById('next-indicator').style.display = 'none';
+                if (typingState.fn) {
+                    const nextFn = typingState.fn;
+                    typingState.fn = null; // Limpa para evitar loops
+                    nextFn();
                 }
             }
+        }
+
+        // Interação via Clique na tela de história
+        document.getElementById('story-screen').addEventListener('click', handleInteraction);
+        
+        // Interação via Teclado (Qualquer tecla ou Seta Direita)
+        document.addEventListener('keydown', (e) => {
+            if (document.getElementById('story-screen').classList.contains('show')) {
+                handleInteraction();
+            }
         });
+
+        // --- LÓGICA DO JOGO ---
 
         function iniciarHistoria(personagem) {
             initAudio(); sfxClick();
@@ -422,7 +436,8 @@
             chapterTitle.textContent = titulo;
             sfxChapter();
             chapterTitle.classList.add('visible');
-            setTimeout(() => { chapterTitle.classList.remove('visible'); setTimeout(callback, 1500); }, 3000);
+            // Timeout reduzido pois o jogador pode pular
+            setTimeout(() => { chapterTitle.classList.remove('visible'); callback(); }, 2500);
         }
 
         // ==================== ROTA DO ERICKY =======================
@@ -430,7 +445,12 @@
             const storyText = document.getElementById('story-text');
             const intro = `.\n3 meses depois do Primeiro Estrondo\nEricky perdeu os pais no primeiro colapso.\n\nAgora vaga sozinho por Manaus com:\num cantil\num pano ensanguentado\numa foto rasgada\ne . . .\n\num baseado`;
             digitarTexto(intro, storyText, () => {
-                setTimeout(() => { storyText.textContent = ''; mostrarTituloCapitulo("CAPÍTULO 1 — “Entre Ruas Vazias”", () => { digitarTexto("Ericky está próximo ao Baratão da Carne, procurando comida.", storyText, () => { mostrarOpcoesIniciaisEricky(); }); }); }, 2000);
+                storyText.textContent = ''; 
+                mostrarTituloCapitulo("CAPÍTULO 1 — “Entre Ruas Vazias”", () => { 
+                    digitarTexto("Ericky está próximo ao Baratão da Carne, procurando comida.", storyText, () => { 
+                        mostrarOpcoesIniciaisEricky(); 
+                    }); 
+                });
             });
         }
 
@@ -451,6 +471,7 @@
             const continueBtn = document.getElementById('continue-btn');
             optionsContainer.classList.remove('visible');
             
+            // Pequeno delay para limpar
             setTimeout(() => {
                 storyText.textContent = '';
                 let txt = "";
@@ -492,19 +513,15 @@
                 }
                 salvarProgresso();
                 digitarTexto(txt, storyText, () => {
-                    continueBtn.style.display = 'block';
-                    continueBtn.onclick = mostrarRotasRetornoEricky;
-                    continueBtn.textContent = "Decidir caminho de volta";
+                    mostrarRotasRetornoEricky();
                 });
-            }, 500);
+            }, 100);
         }
 
         function mostrarRotasRetornoEricky() {
             sfxClick();
             const storyText = document.getElementById('story-text');
-            const continueBtn = document.getElementById('continue-btn');
             const optionsContainer = document.getElementById('options-container');
-            continueBtn.style.display = 'none';
             storyText.textContent = "";
             digitarTexto("Está na hora de voltar para casa. Há três caminhos possíveis à sua frente.", storyText, () => {
                 optionsContainer.innerHTML = `
@@ -525,7 +542,7 @@
 
             if (rota === 1) {
                 gameState.experienciaCombate += 1;
-                digitarTexto("Você segue pela avenida principal. É o caminho mais exposto, mas você mantém o foco.\nVocê chega em segurança.\n(+1 Luta)", storyText, () => setTimeout(irParaCasaEricky, 3000));
+                digitarTexto("Você segue pela avenida principal. É o caminho mais exposto, mas você mantém o foco.\nVocê chega em segurança.\n(+1 Luta)", storyText, () => irParaCasaEricky());
             } else if (rota === 2) {
                 digitarTexto("Você corta caminho pelos becos escuros.\nDe repente, latidos furiosos.\n\nTRÊS CACHORROS BRAVOS BLOQUEIAM O CAMINHO.", storyText, mostrarOpcoesCachorros);
             } else {
@@ -549,9 +566,9 @@
             optionsContainer.classList.remove('visible');
             storyText.textContent = "";
             if (acao === 'investigar') {
-                digitarTexto("Você entra com cuidado. Ao chegar na sala, não encontra ninguém.\n\nOlhando as carteiras vazias, você lembra da época em que estudava lá. Nostalgia.", storyText, () => setTimeout(irParaCasaEricky, 5000));
+                digitarTexto("Você entra com cuidado. Ao chegar na sala, não encontra ninguém.\n\nOlhando as carteiras vazias, você lembra da época em que estudava lá. Nostalgia.", storyText, () => irParaCasaEricky());
             } else {
-                digitarTexto("Melhor não arriscar. Você aperta o passo e segue seu caminho.", storyText, () => setTimeout(irParaCasaEricky, 3000));
+                digitarTexto("Melhor não arriscar. Você aperta o passo e segue seu caminho.", storyText, () => irParaCasaEricky());
             }
         }
 
@@ -573,26 +590,23 @@
             storyText.textContent = "";
             if (acao === 'fugir') {
                 gameState.experienciaCombate -= 2;
-                digitarTexto("Você corre desesperado. Tropeça e torce o pé, mas consegue chegar em casa.\n(Pé torcido: -2 Luta)", storyText, () => setTimeout(irParaCasaEricky, 4000));
+                digitarTexto("Você corre desesperado. Tropeça e torce o pé, mas consegue chegar em casa.\n(Pé torcido: -2 Luta)", storyText, () => irParaCasaEricky());
             } else if (acao === 'lutar') {
-                if (Math.random() <= 0.7) digitarTexto("Você grita e avança com agressividade. Os cachorros recuam e fogem.\nVocê passa ileso.", storyText, () => setTimeout(irParaCasaEricky, 3000));
+                if (Math.random() <= 0.7) digitarTexto("Você grita e avança com agressividade. Os cachorros recuam e fogem.\nVocê passa ileso.", storyText, () => irParaCasaEricky());
                 else {
                     gameState.experienciaCombate -= 3; 
-                    digitarTexto("Eles não se assustam. Um deles te morde na perna antes de você fugir.\n(Mordida: -3 Luta)", storyText, () => setTimeout(irParaCasaEricky, 4000));
+                    digitarTexto("Eles não se assustam. Um deles te morde na perna antes de você fugir.\n(Mordida: -3 Luta)", storyText, () => irParaCasaEricky());
                 }
             } else {
                 gameState.experienciaCombate -= 3;
-                digitarTexto("Você tenta passar protegendo o rosto. Um dos cachorros morde seu braço com força.\n(Mordida feia: -3 Luta)", storyText, () => setTimeout(irParaCasaEricky, 4000));
+                digitarTexto("Você tenta passar protegendo o rosto. Um dos cachorros morde seu braço com força.\n(Mordida feia: -3 Luta)", storyText, () => irParaCasaEricky());
             }
         }
 
         function irParaCasaEricky() {
             sfxClick();
             const storyText = document.getElementById('story-text');
-            const continueBtn = document.getElementById('continue-btn');
-            if(continueBtn) continueBtn.style.display = 'none'; 
             storyText.textContent = '';
-
             digitarTexto("Finalmente em casa. Ericky tranca o que restou da porta.\n\nEle marca no mapa onde vasculhou e pensa em Nathyeli.", storyText, () => {
                 showNightOptionsEricky();
             });
@@ -638,21 +652,19 @@
                 };
             };
 
-            const finalDia = () => setTimeout(decisaoDia2Ericky, 4000);
+            const finalDia = () => decisaoDia2Ericky();
 
             if (acao === 'dormir') {
                 if (!gameState.nightActions.teclado) {
                     digitarTexto("Ericky se deita nos escombros e pega no sono...\n\nDE REPENTE!\n\nPAFT!\n\nUm barulho no vidro o acorda. Ele corre para ver...", storyText, () => {
-                        setTimeout(() => {
-                            sfxThud();
-                            digitarTexto("\n\nEricky vê um homem mascarado encarando a casa no escuro.\nApós 5 segundos, o homem foge.\n(Novo traço: Paranoia)\n\nFIM DO DIA 1", storyText, () => {
-                                gameState.paranoia = true;
-                                setTimeout(decisaoDia2Ericky, 4000);
-                            });
-                        }, 1500);
+                        sfxThud();
+                        digitarTexto("\n\nEricky vê um homem mascarado encarando a casa no escuro.\nApós 5 segundos, o homem foge.\n(Novo traço: Paranoia)\n\nFIM DO DIA 1", storyText, () => {
+                            gameState.paranoia = true;
+                            finalDia();
+                        });
                     });
                 } else {
-                    digitarTexto("O cansaço vence. Ericky apaga imediatamente.\n\nFIM DO DIA 1", storyText, () => setTimeout(decisaoDia2Ericky, 2500));
+                    digitarTexto("O cansaço vence. Ericky apaga imediatamente.\n\nFIM DO DIA 1", storyText, () => finalDia());
                 }
             } else if (acao === 'baseado') {
                 gameState.nightActions.baseado = true;
@@ -660,13 +672,11 @@
             } else { 
                 gameState.nightActions.teclado = true;
                 digitarTexto("Ele senta em frente ao teclado. Toca acordes tristes...\n\nPAFT!\n\nAlguém joga uma pedra na janela.", storyText, () => {
-                    setTimeout(() => {
-                        sfxThud();
-                        digitarTexto("\n\nEricky vê um homem mascarado encarando a casa no escuro.\nApós 5 segundos, o homem foge.\n(Novo traço: Paranoia)", storyText, () => {
-                             gameState.paranoia = true;
-                             continuarNoite();
-                        });
-                    }, 1000);
+                    sfxThud();
+                    digitarTexto("\n\nEricky vê um homem mascarado encarando a casa no escuro.\nApós 5 segundos, o homem foge.\n(Novo traço: Paranoia)", storyText, () => {
+                            gameState.paranoia = true;
+                            continuarNoite();
+                    });
                 });
             }
         }
@@ -727,21 +737,17 @@
             } else {
                 txt = "O DB foi saqueado. Apenas vidro e prateleiras vazias.";
             }
-            digitarTexto(txt, storyText, () => { setTimeout(cenaCrateraEricky, 2000); });
+            digitarTexto(txt, storyText, () => { setTimeout(cenaCrateraEricky, 500); });
         }
 
         function cenaCrateraEricky() {
             const storyText = document.getElementById('story-text');
             storyText.textContent = '';
             digitarTexto("Quando está prestes a voltar, Ericky ouve gritos agudos vindo da cratera gigante.\n\nEle observa de longe...", storyText, () => {
-                setTimeout(() => {
-                    digitarTexto("TRÊS BANDIDOS CERCAM UM CASAL.", storyText, () => {
-                        sfxThud();
-                        setTimeout(() => {
-                            digitarTexto("\n\nEles lutam. Um bandido empurra a mulher...\nELA CAI NA CRATERA.\n\nO homem grita. Os bandidos começam a espancá-lo.", storyText, mostrarEscolhaErickyCratera);
-                        }, 2000);
-                    });
-                }, 2000);
+                digitarTexto("TRÊS BANDIDOS CERCAM UM CASAL.", storyText, () => {
+                    sfxThud();
+                    digitarTexto("\n\nEles lutam. Um bandido empurra a mulher...\nELA CAI NA CRATERA.\n\nO homem grita. Os bandidos começam a espancá-lo.", storyText, mostrarEscolhaErickyCratera);
+                });
             });
         }
 
@@ -866,9 +872,7 @@
 
         function perseguicaoY() {
             const storyText = document.getElementById('story-text');
-            setTimeout(() => {
-                digitarTexto("\n\nEle sobe um barranco íngreme.", storyText, mostrarOpcoesPerseguicao);
-            }, 1000);
+            digitarTexto("\n\nEle sobe um barranco íngreme.", storyText, mostrarOpcoesPerseguicao);
         }
 
         function mostrarOpcoesPerseguicao() {
@@ -892,29 +896,23 @@
                     digitarTexto("Você sobe com dificuldade, mas consegue.", storyText, finalY);
                 } else {
                     gameState.saude -= 10;
-                    digitarTexto("Você escorrega e cai, machucando o joelho. Quando levanta, ele sumiu.\n(Dano sofrido)", storyText, () => setTimeout(retornoCasaDia2Ericky, 3000));
+                    digitarTexto("Você escorrega e cai, machucando o joelho. Quando levanta, ele sumiu.\n(Dano sofrido)", storyText, () => setTimeout(retornoCasaDia2Ericky, 500));
                 }
             } else {
-                digitarTexto("Você dá a volta, mas demora demais. Ele desapareceu.", storyText, () => setTimeout(retornoCasaDia2Ericky, 3000));
+                digitarTexto("Você dá a volta, mas demora demais. Ele desapareceu.", storyText, () => setTimeout(retornoCasaDia2Ericky, 500));
             }
         }
 
         function finalY() {
             const storyText = document.getElementById('story-text');
-            setTimeout(() => {
-                digitarTexto("\n\nVocês sobem a escada do T4. O homem olha no seu olho, com metade do rosto tampado.\n\nEle pula a cerca e cai do 2º andar até o chão.\n\nQuando você olha... não tem ninguém lá. Ele desapareceu.", storyText, () => setTimeout(retornoCasaDia2Ericky, 5000));
-            }, 1000);
+            digitarTexto("\n\nVocês sobem a escada do T4. O homem olha no seu olho, com metade do rosto tampado.\n\nEle pula a cerca e cai do 2º andar até o chão.\n\nQuando você olha... não tem ninguém lá. Ele desapareceu.", storyText, () => setTimeout(retornoCasaDia2Ericky, 500));
         }
 
         function imobilizarY() {
             const storyText = document.getElementById('story-text');
-            setTimeout(() => {
-                digitarTexto("\n\n— Quem é você? — pergunta Ericky.\n\n— Me chamam de Y. — diz o homem.\n\nEricky vê que ele não é ameaça e o solta.", storyText, () => {
-                    setTimeout(() => {
-                        digitarTexto("\n\n— Faço parte do Clube dos 5: Y, N, S, G, V. — diz ele.\n\nEricky ri, mas Y o convida para o grupo.", storyText, mostrarConviteY);
-                    }, 4000);
-                });
-            }, 1000);
+            digitarTexto("\n\n— Quem é você? — pergunta Ericky.\n\n— Me chamam de Y. — diz o homem.\n\nEricky vê que ele não é ameaça e o solta.", storyText, () => {
+                digitarTexto("\n\n— Faço parte do Clube dos 5: Y, N, S, G, V. — diz ele.\n\nEricky ri, mas Y o convida para o grupo.", storyText, mostrarConviteY);
+            });
         }
 
         function mostrarConviteY() {
@@ -936,9 +934,9 @@
             if (resp === 'aceitar') {
                 metaGame.erickyEntrouClube5 = true;
                 salvarProgresso();
-                digitarTexto("Ericky aceita. Y diz:\n— Esteja aqui amanhã cedo. Vamos para a base.\n\nEricky volta para casa com um novo propósito.", storyText, () => setTimeout(retornoCasaClube5, 4000));
+                digitarTexto("Ericky aceita. Y diz:\n— Esteja aqui amanhã cedo. Vamos para a base.\n\nEricky volta para casa com um novo propósito.", storyText, () => setTimeout(retornoCasaClube5, 500));
             } else {
-                digitarTexto("Ericky recusa. Eles se despedem e Y some nas sombras.", storyText, () => setTimeout(retornoCasaDia2Ericky, 3000));
+                digitarTexto("Ericky recusa. Eles se despedem e Y some nas sombras.", storyText, () => setTimeout(retornoCasaDia2Ericky, 500));
             }
         }
 
@@ -946,7 +944,7 @@
             const storyText = document.getElementById('story-text');
             storyText.textContent = "";
             digitarTexto("Ericky chega em casa. A noite está silenciosa.\n\nEle apenas arruma sua mochila, come algo e dorme pesado.", storyText, () => {
-                setTimeout(diaSeguinteClube5, 5000);
+                setTimeout(diaSeguinteClube5, 500);
             });
         }
 
@@ -955,7 +953,7 @@
             storyText.textContent = "";
             mostrarTituloCapitulo("CAPÍTULO 3 — “Clube dos 5”", () => {
                 digitarTexto("O sol nasce. Ericky volta ao Shopping Phellipe Daou.\n\nY já está lá. — Vamos. A base fica no antigo boliche do Shopping Sumaúma.", storyText, () => {
-                    setTimeout(caminhadaSumauma, 4000);
+                    setTimeout(caminhadaSumauma, 500);
                 });
             });
         }
@@ -964,7 +962,7 @@
             const storyText = document.getElementById('story-text');
             storyText.textContent = "";
             digitarTexto("No caminho, Y conta que perdeu o braço no Primeiro Estrondo.\n\n— Mas o V cuidou da ferida. Ele é um gênio. Está desenvolvendo um braço robótico para mim.", storyText, () => {
-                setTimeout(chegadaBaseSumauma, 5000);
+                setTimeout(chegadaBaseSumauma, 500);
             });
         }
 
@@ -979,7 +977,7 @@
                         continueBtn.style.display = 'block';
                         continueBtn.onclick = fimDeJogoEricky;
                     });
-                }, 8000);
+                }, 500);
             });
         }
 
@@ -1032,22 +1030,18 @@
             const storyText = document.getElementById('story-text');
             optionsContainer.classList.remove('visible');
             storyText.textContent = '';
+            
+            const fim = () => { setTimeout(() => { digitarTexto("\n\nFIM DO DIA 2", storyText, () => { setTimeout(iniciarCapitulo3Ericky, 500); }); }, 500); };
+
             if (acao === 'luta') {
                 gameState.experienciaCombate += 1;
-                digitarTexto("Ericky soca o saco de areia improvisado até os nós dos dedos sangrarem. A dor física abafa a dor mental.\n(+1 Exp Combate)", storyText, fimDoDia2Ericky);
+                digitarTexto("Ericky soca o saco de areia improvisado até os nós dos dedos sangrarem. A dor física abafa a dor mental.\n(+1 Exp Combate)", storyText, fim);
             } else if (acao === 'estudo') {
                 gameState.conhecimentoEngenharia += 1;
-                digitarTexto("Sob a luz fraca de uma vela, ele estuda diagramas estruturais. Entender como as coisas caem pode ajudar a entender como mantê-las em pé.\n(+1 Conhecimento)", storyText, fimDoDia2Ericky);
+                digitarTexto("Sob a luz fraca de uma vela, ele estuda diagramas estruturais. Entender como as coisas caem pode ajudar a entender como mantê-las em pé.\n(+1 Conhecimento)", storyText, fim);
             } else {
-                digitarTexto("Ele se entrega ao sono imediatamente.", storyText, fimDoDia2Ericky);
+                digitarTexto("Ele se entrega ao sono imediatamente.", storyText, fim);
             }
-        }
-
-        function fimDoDia2Ericky() {
-            setTimeout(() => {
-                const storyText = document.getElementById('story-text');
-                digitarTexto("\n\nFIM DO DIA 2", storyText, () => { setTimeout(iniciarCapitulo3Ericky, 3000); });
-            }, 2000);
         }
 
         function iniciarCapitulo3Ericky() {
@@ -1057,7 +1051,7 @@
                 digitarTexto("Madrugada. Barulho na sala. Algo caiu.\n\nEricky vê um invasor mascarado. O mesmo da janela.", storyText, () => {
                     setTimeout(() => {
                          digitarTexto("\n\nO invasor foge. Ericky sabe: foi marcado.\nAo amanhecer, ele decide mudar de base.", storyText, mostrarOpcoesBaseEricky);
-                    }, 3000);
+                    }, 500);
                 });
             });
         }
@@ -1086,14 +1080,14 @@
             const storyText = document.getElementById('story-text');
             optionsContainer.classList.remove('visible');
             storyText.textContent = '';
-            digitarTexto("O mercado é pequeno, tem grades de ferro reforçadas.\nÉ perfeito. Ericky estabelece sua nova base.", storyText, () => setTimeout(iniciarCapitulo4Ericky, 3000));
+            digitarTexto("O mercado é pequeno, tem grades de ferro reforçadas.\nÉ perfeito. Ericky estabelece sua nova base.", storyText, () => setTimeout(iniciarCapitulo4Ericky, 500));
         }
 
         function iniciarCapitulo4Ericky() {
             const storyText = document.getElementById('story-text');
             storyText.textContent = '';
             mostrarTituloCapitulo("CAPÍTULO 4 — “Amigos ou Inimigos?”", () => {
-                digitarTexto("Três meses se passam.\n\nEricky não esquece aquela visão da cratera. Os bandidos frios simplesmente jogaram a mulher lá de cima.\n\nO que o mundo se tornou?", storyText, () => { setTimeout(verificarAlarmeEricky, 3000); });
+                digitarTexto("Três meses se passam.\n\nEricky não esquece aquela visão da cratera. Os bandidos frios simplesmente jogaram a mulher lá de cima.\n\nO que o mundo se tornou?", storyText, () => { setTimeout(verificarAlarmeEricky, 500); });
             });
         }
 
@@ -1101,9 +1095,9 @@
             const storyText = document.getElementById('story-text');
             storyText.textContent = "";
             if (gameState.conhecimentoEngenharia > 0) {
-                digitarTexto("! \n\nBEEP! BEEP!\n\nO sistema de alarme dispara. Ericky acorda preparado.", storyText, () => setTimeout(cenaEncontroEricky, 3000));
+                digitarTexto("! \n\nBEEP! BEEP!\n\nO sistema de alarme dispara. Ericky acorda preparado.", storyText, () => setTimeout(cenaEncontroEricky, 500));
             } else {
-                digitarTexto("! \n\nCRASH!\nAlgo cai na entrada. Ericky acorda assustado.", storyText, () => setTimeout(cenaEncontroEricky, 3000));
+                digitarTexto("! \n\nCRASH!\nAlgo cai na entrada. Ericky acorda assustado.", storyText, () => setTimeout(cenaEncontroEricky, 500));
             }
         }
 
@@ -1143,7 +1137,7 @@
                     <button class="option-btn" onclick="combateRound2Ericky()">Recuar e defender</button>
                 `;
                 optionsContainer.classList.add('visible');
-            }, 2000);
+            }, 500);
         }
 
         function combateRound2Ericky() {
@@ -1166,7 +1160,7 @@
                 } else {
                     digitarTexto("— Calma! Eu não quero machucar. Só preciso de comida.\n\nEle tira a máscara.\nEricky vê um rosto desconhecido, cansado e sofrido.", storyText, dialogoDesconhecidoEricky);
                 }
-            }, 3000);
+            }, 500);
         }
 
         function dialogoCrateraEricky() {
@@ -1246,23 +1240,38 @@
             digitarTexto("07.24.2034", storyText, () => {
                 setTimeout(() => {
                     storyText.textContent = "";
-                    digitarTexto("Leo estava trabalhando quando o chão começou a vibrar. Rapidamente saiu de sua empresa, junto aos outros funcionários.\n\nTudo começou a desabar, viu pessoas caindo em crateras, acidentes, o que estava acontecendo?", storyText, () => {
-                        setTimeout(() => {
-                            digitarTexto("\n\nA tempo conseguiu pegar seu carro e ir dirigindo para casa o mais rápido possível, evitando colisões e vendo o caos.", storyText, () => {
-                                setTimeout(() => {
-                                    storyText.textContent = "";
-                                    digitarTexto("Quando chegou em casa...\n\nNão havia nada. Onde era sua casa, virou uma enorme cratera do tamanho de um estádio de futebol.", storyText, () => {
-                                        setTimeout(() => {
-                                            digitarTexto("\n\nLeo saiu o mais rápido possível, antes que ela aumentasse.", storyText, () => {
-                                                setTimeout(irCasaLorena, 4000);
-                                            });
-                                        }, 3000);
-                                    });
-                                }, 4000);
-                            });
-                        }, 4000);
-                    });
+                    digitarTexto("Leo estava trabalhando quando o chão começou a vibrar. Rapidamente saiu de sua empresa, junto aos outros funcionários.\n\nUma decisão rápida.", storyText, mostrarEscolhaCarroLeo);
                 }, 2000);
+            });
+        }
+        
+        function mostrarEscolhaCarroLeo() {
+             const optionsContainer = document.getElementById('options-container');
+            optionsContainer.innerHTML = `
+                <button class="option-btn" onclick="escolhaCarroLeo('carro')">Ir para seu carro</button>
+                <button class="option-btn locked">Ir com amigo</button>
+            `;
+            optionsContainer.classList.add('visible');
+        }
+
+        function escolhaCarroLeo(escolha) {
+             sfxClick();
+            const optionsContainer = document.getElementById('options-container');
+            const storyText = document.getElementById('story-text');
+            optionsContainer.classList.remove('visible');
+            storyText.textContent = "";
+            
+             digitarTexto("Tudo começou a desabar, viu pessoas caindo em crateras, acidentes, o que estava acontecendo?\n\nA tempo conseguiu pegar seu carro e ir dirigindo para casa o mais rápido possível, evitando colisões e vendo o caos.", storyText, () => {
+                setTimeout(() => {
+                    storyText.textContent = "";
+                    digitarTexto("Quando chegou em casa...\n\nNão havia nada. Onde era sua casa, virou uma enorme cratera do tamanho de um estádio de futebol.", storyText, () => {
+                        setTimeout(() => {
+                            digitarTexto("\n\nLeo saiu o mais rápido possível, antes que ela aumentasse.", storyText, () => {
+                                setTimeout(irCasaLorena, 4000);
+                            });
+                        }, 3000);
+                    });
+                }, 4000);
             });
         }
 
@@ -1484,7 +1493,7 @@
         function leoTimeJump() {
             const storyText = document.getElementById('story-text');
             storyText.textContent = "";
-            digitarTexto("Leo agora usa uma máscara, passou esses 3 meses matando quem estivesse em seu caminho.\nA máscara suja de sangue.\n\nPorém, a fome. Não havia nada para comer. Ele procura em todos os lugares. Nada.\n\nEle acha um mercado fechado.", storyText, mostrarInvasaoMercado);
+            digitarTexto("Leo, passou 3 meses tentando sobreviver, procurando comida, fugindo de pessoas mal intencionadas, durante esse tempo leo achou um caminhão cheio de latas, que lhe proporcionou ficar em casa sem precisar saquear por 2 meses.\n\nAgora, tudo tinha acabado.\nLeo precisava achar comida.", storyText, mostrarInvasaoMercado);
         }
 
         function mostrarInvasaoMercado() {
